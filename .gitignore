@@ -9,3 +9,9 @@
 *.iobj
 *.ipdb
 Cargo.lock
+# Generated logs
+*_debug.log
+*_crash.log
+*_modal_debug.log
+# Test artifacts
+pbinterp/tests/results.txt

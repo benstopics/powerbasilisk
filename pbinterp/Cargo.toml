@@ -1,0 +1,10 @@
+[package]
+name = "pbinterp"
+version = "0.1.0"
+edition = "2021"
+description = "PowerBASIC 9.80 interpreter and test runner"
+license = "MIT"
+repository = "https://github.com/benstopics/powerbasilisk"
+
+[dependencies]
+pb = { path = "../pb" }
