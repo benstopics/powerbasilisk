@@ -81,13 +81,19 @@ This isn't only about Wall Street Raider. There are PowerBASIC developers out th
 
 ## Quick Start
 
-### Prerequisites
+### Option 1: Download prebuilt binaries (recommended)
 
-- **Rust** 1.75+ (for building the compiler and interpreter)
-- **LLVM/Clang** 17+ (for compiling generated IR to native code)
-  - Install via `winget install LLVM.LLVM` on Windows
+Grab the latest release from [GitHub Releases](https://github.com/benstopics/powerbasilisk/releases). Prebuilt binaries are available for:
 
-### Build
+- **Windows** (x86_64) — `pbcompiler.exe`, `pbinterp.exe`
+- **macOS** (x86_64, Apple Silicon) — `pbcompiler`, `pbinterp`
+- **Linux** (x86_64, aarch64) — `pbcompiler`, `pbinterp`
+
+Extract the archive and add the directory to your `PATH`, or run the binaries directly.
+
+### Option 2: Build from source
+
+Requires **Rust** 1.75+:
 
 ```bash
 git clone https://github.com/benstopics/powerbasilisk.git
@@ -95,25 +101,34 @@ cd powerbasilisk
 cargo build --release
 ```
 
-This builds two binaries:
-- `target/release/pbcompiler` — the compiler (PB source → LLVM IR → native)
-- `target/release/pbinterp` — the interpreter (PB source → direct execution)
+This builds two binaries in `target/release/`:
+- `pbcompiler` — the compiler (PB source → LLVM IR → native)
+- `pbinterp` — the interpreter (PB source → direct execution)
+
+### Prerequisites for compilation
+
+**LLVM/Clang** 17+ is required for `pbcompiler` to compile generated IR to native code:
+- Windows: `winget install LLVM.LLVM`
+- macOS: `brew install llvm`
+- Linux: `apt install clang llvm` or equivalent
+
+`pbinterp` does **not** require LLVM — it interprets PB code directly from the AST.
 
 ### Compile a PowerBASIC program
 
 ```bash
 # Compile to object file (32-bit, the default)
-./target/release/pbcompiler build hello.bas -o hello
+pbcompiler build hello.bas -o hello
 
 # Compile to executable
-./target/release/pbcompiler build hello.bas -o hello --exe \
+pbcompiler build hello.bas -o hello --exe \
   --runtime-lib pbcompiler/runtime/pb_runtime.obj
 
 # Compile to DLL
-./target/release/pbcompiler build mylib.bas -o mylib --dll
+pbcompiler build mylib.bas -o mylib --dll
 
 # Emit LLVM IR only (for inspection)
-./target/release/pbcompiler build hello.bas -o hello --emit-llvm
+pbcompiler build hello.bas -o hello --emit-llvm
 ```
 
 ### Targeting 32-bit vs 64-bit
@@ -122,11 +137,11 @@ The compiler defaults to 32-bit (`i686-pc-windows-msvc`) for compatibility with 
 
 ```bash
 # 32-bit (default) — compatible with original PowerBASIC binaries
-./target/release/pbcompiler build hello.bas -o hello --exe \
+pbcompiler build hello.bas -o hello --exe \
   --runtime-lib pbcompiler/runtime/pb_runtime.obj
 
 # 64-bit
-./target/release/pbcompiler build hello.bas -o hello --exe \
+pbcompiler build hello.bas -o hello --exe \
   --target x86_64-pc-windows-msvc \
   --runtime-lib pbcompiler/runtime/pb_runtime_x64.obj
 ```
@@ -149,13 +164,13 @@ Both the compiler output and the runtime must use the same target triple. Mixing
 
 ```bash
 # Run a PB program directly (no compilation needed)
-./target/release/pbinterp run hello.bas
+pbinterp run hello.bas
 
 # Run with timeout
-./target/release/pbinterp run tests.bas --timeout 120
+pbinterp run tests.bas --timeout 120
 
 # Dump preprocessed output
-./target/release/pbinterp dump hello.bas
+pbinterp dump hello.bas
 ```
 
 ## CLI Reference
@@ -195,9 +210,11 @@ pbinterp dump <file.bas>
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or pull request.
+Contributions are welcome! There are two main ways to help:
 
-### Development
+### Submit code changes
+
+Open an issue or pull request on GitHub. For development setup:
 
 ```bash
 # Build in debug mode (faster compilation)
@@ -209,6 +226,17 @@ cargo clippy --all-targets
 # Format code
 cargo fmt --all
 ```
+
+### Share your PowerBASIC source code
+
+If you have a PowerBASIC codebase you'd like to compile with PowerBasilisk, send your source to **Ben Ward** at [benstopics@gmail.com](mailto:benstopics@gmail.com). He will:
+
+- Use your code as a **litmus test** for compiler compatibility
+- Write tests based on your program's expected behavior
+- Troubleshoot any compilation or runtime issues for you
+- Report back what works and what still needs compiler support
+
+This is one of the most valuable ways to contribute — real-world PowerBASIC code exposes edge cases and missing features that synthetic tests don't catch. Your code helps make PowerBasilisk work for everyone.
 
 ## License
 

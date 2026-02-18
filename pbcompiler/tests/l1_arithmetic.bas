@@ -8,17 +8,46 @@ FUNCTION PBMAIN() AS LONG
   y = 3
 
   ' Basic arithmetic
-  result = x + y       ' 13
-  result = x - y       ' 7
-  result = x * y       ' 30
-  result = x \ y       ' 3 (integer division)
-  result = x MOD y     ' 1
+  result = x + y
+  IF result <> 13 THEN
+    FUNCTION = 1
+    EXIT FUNCTION
+  END IF
+
+  result = x - y
+  IF result <> 7 THEN
+    FUNCTION = 2
+    EXIT FUNCTION
+  END IF
+
+  result = x * y
+  IF result <> 30 THEN
+    FUNCTION = 3
+    EXIT FUNCTION
+  END IF
+
+  result = x \ y
+  IF result <> 3 THEN
+    FUNCTION = 4
+    EXIT FUNCTION
+  END IF
+
+  result = x MOD y
+  IF result <> 1 THEN
+    FUNCTION = 5
+    EXIT FUNCTION
+  END IF
 
   ' IF/ELSE
   IF x > y THEN
     result = 1
   ELSE
     result = 0
+  END IF
+
+  IF result <> 1 THEN
+    FUNCTION = 6
+    EXIT FUNCTION
   END IF
 
   ' Nested IF
@@ -28,5 +57,10 @@ FUNCTION PBMAIN() AS LONG
     END IF
   END IF
 
-  FUNCTION = result
+  IF result <> 42 THEN
+    FUNCTION = 7
+    EXIT FUNCTION
+  END IF
+
+  FUNCTION = 0  ' All tests passed
 END FUNCTION

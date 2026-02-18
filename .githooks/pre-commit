@@ -1,20 +1,97 @@
 #!/bin/sh
-# Pre-commit hook: runs the same checks as CI (fmt + clippy)
+# Pre-commit hook: runs the same checks as CI (fmt + clippy + compiler tests)
+
+set -e
 
 echo "pre-commit: checking formatting..."
-cargo fmt --all -- --check
-if [ $? -ne 0 ]; then
+cargo fmt --all -- --check || {
   echo ""
   echo "Formatting check failed. Run 'cargo fmt --all' to fix."
   exit 1
-fi
+}
 
 echo "pre-commit: running clippy..."
-cargo clippy --all-targets -- -D warnings 2>&1
-if [ $? -ne 0 ]; then
+cargo clippy --all-targets -- -D warnings 2>&1 || {
   echo ""
   echo "Clippy check failed. Fix the warnings above."
   exit 1
+}
+
+echo "pre-commit: building release..."
+cargo build --release || {
+  echo "Build failed."
+  exit 1
+}
+
+COMPILER="target/release/pbcompiler"
+if [ -f "$COMPILER.exe" ]; then
+  COMPILER="$COMPILER.exe"
 fi
+
+# Build 32-bit runtime
+echo "pre-commit: building 32-bit runtime..."
+clang -c --target=i686-pc-windows-msvc pbcompiler/runtime/pb_runtime.c -o pbcompiler/runtime/pb_runtime.obj || {
+  echo "32-bit runtime build failed."
+  exit 1
+}
+
+# Build 64-bit runtime
+echo "pre-commit: building 64-bit runtime..."
+clang -c --target=x86_64-pc-windows-msvc pbcompiler/runtime/pb_runtime.c -o pbcompiler/runtime/pb_runtime_x64.obj || {
+  echo "64-bit runtime build failed."
+  exit 1
+}
+
+# Run compiler tests (32-bit)
+echo "pre-commit: running compiler tests (32-bit)..."
+failed=0
+for f in pbcompiler/tests/l*.bas; do
+  name=$(basename "$f")
+  base="${f%.bas}"
+  echo "  $name"
+  "$COMPILER" build "$f" -o "$base" --exe --runtime-lib pbcompiler/runtime/pb_runtime.obj || {
+    echo "  COMPILE FAILED: $name"
+    failed=$((failed + 1))
+    continue
+  }
+  "$base.exe"
+  rc=$?
+  if [ $rc -ne 0 ]; then
+    echo "  TEST FAILED: $name (exit $rc)"
+    failed=$((failed + 1))
+  fi
+done
+
+if [ $failed -ne 0 ]; then
+  echo "$failed 32-bit test(s) failed."
+  exit 1
+fi
+echo "  All 32-bit tests passed."
+
+# Run compiler tests (64-bit)
+echo "pre-commit: running compiler tests (64-bit)..."
+failed=0
+for f in pbcompiler/tests/l*.bas; do
+  name=$(basename "$f")
+  base="${f%.bas}_x64"
+  echo "  $name (x64)"
+  "$COMPILER" build "$f" -o "$base" --exe --target x86_64-pc-windows-msvc --runtime-lib pbcompiler/runtime/pb_runtime_x64.obj || {
+    echo "  COMPILE FAILED: $name (x64)"
+    failed=$((failed + 1))
+    continue
+  }
+  "$base.exe"
+  rc=$?
+  if [ $rc -ne 0 ]; then
+    echo "  TEST FAILED: $name (x64, exit $rc)"
+    failed=$((failed + 1))
+  fi
+done
+
+if [ $failed -ne 0 ]; then
+  echo "$failed 64-bit test(s) failed."
+  exit 1
+fi
+echo "  All 64-bit tests passed."
 
 echo "pre-commit: all checks passed."
