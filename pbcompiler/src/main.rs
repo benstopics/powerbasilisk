@@ -19,7 +19,7 @@ fn main() {
             "Usage: pbcompiler build <file.bas> [-o output] [--dll] [--exe] [--session-struct]"
         );
         eprintln!("       [--emit-llvm] [--parse-only] [--runtime-lib path] [--lib-dir path]");
-        eprintln!("       [--debug]");
+        eprintln!("       [--debug] [--target triple]");
         process::exit(2);
     }
 
@@ -41,6 +41,8 @@ fn main() {
     let split_threshold = get_flag_value(&args, "--split-threshold")
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(0);
+    let target =
+        get_flag_value(&args, "--target").unwrap_or_else(|| codegen::DEFAULT_TARGET.to_string());
 
     let opts = codegen::CompileOptions {
         dll_mode,
@@ -51,6 +53,7 @@ fn main() {
         runtime_lib,
         lib_dir,
         split_threshold,
+        target,
     };
 
     match compile_file(file_path, &output, parse_only, &opts) {

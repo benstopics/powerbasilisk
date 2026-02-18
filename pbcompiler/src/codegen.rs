@@ -8,6 +8,8 @@ use crate::llvm_ir::{FunctionBuilder, IrType, ModuleBuilder, Val};
 use crate::symbols::{ArrayInfo, SymbolTable};
 
 /// Options for the compilation pipeline.
+pub const DEFAULT_TARGET: &str = "i686-pc-windows-msvc";
+
 pub struct CompileOptions {
     pub dll_mode: bool,
     pub exe_mode: bool,
@@ -17,6 +19,7 @@ pub struct CompileOptions {
     pub runtime_lib: Option<String>, // path to pb_runtime.obj
     pub lib_dir: Option<String>, // path to directory containing ui.lib
     pub split_threshold: usize, // split functions exceeding this many IR lines (0 = disabled)
+    pub target: String, // LLVM target triple (e.g. "i686-pc-windows-msvc", "x86_64-pc-windows-msvc")
 }
 
 /// Compile a parsed PB program to LLVM IR, then optionally to object code via clang.
@@ -26,7 +29,7 @@ pub fn compile(
     opts: &CompileOptions,
     pp_constants: &HashMap<String, i64>,
 ) -> PbResult<()> {
-    let mut compiler = Compiler::new();
+    let mut compiler = Compiler::with_target(&opts.target);
     compiler.session_mode = opts.session_mode;
     compiler.debug_mode = opts.debug_mode;
     compiler.pp_constants = pp_constants.clone();
@@ -66,7 +69,7 @@ pub fn compile(
 
         let main_obj_path = output_path.with_extension("main.obj");
         // Use -O0 to avoid clang 17.0.1 crashes (Register Coalescer, DAG ISel)
-        compile_with_clang(&main_ll_path, &main_obj_path, "-O0")?;
+        compile_with_clang(&main_ll_path, &main_obj_path, "-O0", &opts.target)?;
         eprintln!(
             "[pbcompiler] Wrote main object: {}",
             main_obj_path.display()
@@ -83,7 +86,7 @@ pub fn compile(
         );
 
         let split_obj_path = output_path.with_extension("split.obj");
-        compile_split_module(&split_ll_path, &split_obj_path)?;
+        compile_split_module(&split_ll_path, &split_obj_path, &opts.target)?;
         eprintln!(
             "[pbcompiler] Wrote split object: {}",
             split_obj_path.display()
@@ -92,7 +95,7 @@ pub fn compile(
     } else {
         // No split needed — compile as one unit
         let obj_path = output_path.with_extension("obj");
-        compile_with_clang(&ll_path, &obj_path, "-O2")?;
+        compile_with_clang(&ll_path, &obj_path, "-O2", &opts.target)?;
         eprintln!("[pbcompiler] Wrote object: {}", obj_path.display());
         obj_paths.push(obj_path);
     }
@@ -100,7 +103,7 @@ pub fn compile(
     // Link if requested
     if opts.dll_mode {
         let dll_path = output_path.with_extension("dll");
-        link_dll(&obj_paths[0], &dll_path)?;
+        link_dll(&obj_paths[0], &dll_path, &opts.target)?;
         eprintln!("[pbcompiler] Linked DLL: {}", dll_path.display());
     }
 
@@ -114,15 +117,23 @@ pub fn compile(
     Ok(())
 }
 
-fn compile_with_clang(ll_path: &Path, obj_path: &Path, opt_level: &str) -> PbResult<()> {
+fn compile_with_clang(
+    ll_path: &Path,
+    obj_path: &Path,
+    opt_level: &str,
+    target: &str,
+) -> PbResult<()> {
+    let target_flag = format!("--target={}", target);
+    let ll_str = ll_path.to_string_lossy();
+    let obj_str = obj_path.to_string_lossy();
     let output = std::process::Command::new("clang")
         .args([
             "-c",
             opt_level,
-            "--target=i686-pc-windows-msvc",
-            &ll_path.to_string_lossy(),
+            &target_flag,
+            ll_str.as_ref(),
             "-o",
-            &obj_path.to_string_lossy(),
+            obj_str.as_ref(),
         ])
         .output()
         .map_err(|e| PbError::io(format!("Failed to run clang: {}", e)))?;
@@ -138,17 +149,21 @@ fn compile_with_clang(ll_path: &Path, obj_path: &Path, opt_level: &str) -> PbRes
 /// Compile a split module containing large functions.
 /// Tries multiple strategies since these functions crash clang's default ISel.
 /// If all strategies fail, generates stubs for uncompilable functions.
-fn compile_split_module(ll_path: &Path, obj_path: &Path) -> PbResult<()> {
+fn compile_split_module(ll_path: &Path, obj_path: &Path, target: &str) -> PbResult<()> {
+    let target_flag = format!("--target={}", target);
+    let ll_str = ll_path.to_string_lossy();
+    let obj_str = obj_path.to_string_lossy();
+
     // Strategy 1: Try -O1 (lighter optimization, may avoid DAG explosion)
     eprintln!("[pbcompiler] Compiling split module with -O1...");
     let result = std::process::Command::new("clang")
         .args([
             "-c",
             "-O1",
-            "--target=i686-pc-windows-msvc",
-            &ll_path.to_string_lossy(),
+            &target_flag,
+            ll_str.as_ref(),
             "-o",
-            &obj_path.to_string_lossy(),
+            obj_str.as_ref(),
         ])
         .output();
 
@@ -166,10 +181,10 @@ fn compile_split_module(ll_path: &Path, obj_path: &Path) -> PbResult<()> {
             "-O0",
             "-mllvm",
             "-fast-isel",
-            "--target=i686-pc-windows-msvc",
-            &ll_path.to_string_lossy(),
+            &target_flag,
+            ll_str.as_ref(),
             "-o",
-            &obj_path.to_string_lossy(),
+            obj_str.as_ref(),
         ])
         .output();
 
@@ -185,10 +200,10 @@ fn compile_split_module(ll_path: &Path, obj_path: &Path) -> PbResult<()> {
         .args([
             "-c",
             "-O0",
-            "--target=i686-pc-windows-msvc",
-            &ll_path.to_string_lossy(),
+            &target_flag,
+            ll_str.as_ref(),
             "-o",
-            &obj_path.to_string_lossy(),
+            obj_str.as_ref(),
         ])
         .output();
 
@@ -203,12 +218,12 @@ fn compile_split_module(ll_path: &Path, obj_path: &Path) -> PbResult<()> {
     // Emit stub functions that return default values so linking can proceed.
     eprintln!("[pbcompiler] All compilation strategies failed for split module.");
     eprintln!("[pbcompiler] Generating stub functions for uncompilable functions...");
-    generate_stub_module(ll_path, obj_path)
+    generate_stub_module(ll_path, obj_path, target)
 }
 
 /// Generate a stub .ll module where each function just returns a default value.
 /// This allows linking to succeed even when clang can't compile the full function.
-fn generate_stub_module(original_ll: &Path, obj_path: &Path) -> PbResult<()> {
+fn generate_stub_module(original_ll: &Path, obj_path: &Path, target: &str) -> PbResult<()> {
     let content = std::fs::read_to_string(original_ll)
         .map_err(|e| PbError::io(format!("Failed to read split .ll: {}", e)))?;
 
@@ -308,18 +323,21 @@ fn generate_stub_module(original_ll: &Path, obj_path: &Path) -> PbResult<()> {
     std::fs::write(&stub_ll, &stub)
         .map_err(|e| PbError::io(format!("Failed to write stub .ll: {}", e)))?;
 
-    compile_with_clang(&stub_ll, obj_path, "-O0")
+    compile_with_clang(&stub_ll, obj_path, "-O0", target)
 }
 
-fn link_dll(obj_path: &Path, dll_path: &Path) -> PbResult<()> {
+fn link_dll(obj_path: &Path, dll_path: &Path, target: &str) -> PbResult<()> {
+    let target_flag = format!("--target={}", target);
+    let obj_str = obj_path.to_string_lossy();
+    let dll_str = dll_path.to_string_lossy();
     let output = std::process::Command::new("clang")
         .args([
             "-shared",
-            "--target=i686-pc-windows-msvc",
-            &obj_path.to_string_lossy(),
+            &target_flag,
+            obj_str.as_ref(),
             "-loleaut32",
             "-o",
-            &dll_path.to_string_lossy(),
+            dll_str.as_ref(),
         ])
         .output()
         .map_err(|e| PbError::io(format!("Failed to run clang for DLL linking: {}", e)))?;
@@ -334,7 +352,7 @@ fn link_dll(obj_path: &Path, dll_path: &Path) -> PbResult<()> {
 
 /// Link object files into an executable.
 fn link_exe(obj_paths: &[&Path], exe_path: &Path, opts: &CompileOptions) -> PbResult<()> {
-    let mut args: Vec<String> = vec!["--target=i686-pc-windows-msvc".to_string()];
+    let mut args: Vec<String> = vec![format!("--target={}", opts.target)];
 
     // Add all object files
     for obj in obj_paths {
@@ -866,9 +884,9 @@ impl Compiler {
         )
     }
 
-    fn new() -> Self {
+    fn with_target(target: &str) -> Self {
         Compiler {
-            module: ModuleBuilder::new("i686-pc-windows-msvc"),
+            module: ModuleBuilder::new(target),
             symbols: SymbolTable::new(),
             functions: HashMap::new(),
             subs: HashMap::new(),
