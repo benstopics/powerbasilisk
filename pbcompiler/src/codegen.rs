@@ -58,7 +58,7 @@ pub fn compile(
 
     let mut obj_paths: Vec<std::path::PathBuf> = Vec::new();
 
-    if split_ir.is_some() {
+    if let Some(ref split_ir_content) = split_ir {
         // Write the split main .ll (large functions removed)
         let main_ll_path = output_path.with_extension("main.ll");
         std::fs::write(&main_ll_path, &main_ir)
@@ -75,7 +75,7 @@ pub fn compile(
 
         // Write and compile the split .ll (large functions only)
         let split_ll_path = output_path.with_extension("split.ll");
-        std::fs::write(&split_ll_path, split_ir.as_ref().unwrap())
+        std::fs::write(&split_ll_path, split_ir_content)
             .map_err(|e| PbError::io(format!("Failed to write split .ll: {}", e)))?;
         eprintln!(
             "[pbcompiler] Split large functions to: {}",
@@ -2463,10 +2463,10 @@ impl Compiler {
         let body_label = fb.next_label("do.body");
         let exit_label = fb.next_label("do.exit");
 
-        if do_stmt.is_pre_test && do_stmt.condition.is_some() {
+        if let (true, Some(condition)) = (do_stmt.is_pre_test, do_stmt.condition.as_ref()) {
             fb.br(&cond_label);
             fb.label(&cond_label);
-            let cond = self.compile_expr_as_bool(fb, do_stmt.condition.as_ref().unwrap())?;
+            let cond = self.compile_expr_as_bool(fb, condition)?;
             let cond = if !do_stmt.is_while {
                 // UNTIL: negate
                 let one = fb.const_i1(true);
