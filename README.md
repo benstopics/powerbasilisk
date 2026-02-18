@@ -32,7 +32,9 @@ Zale died in 2012. In 2017, **Drake Software** (owned by **Cinven**, a European 
 
 The project that drives PowerBasilisk's development is [Wall Street Raider](https://www.wallstreetraider.com) which is a 180,000-line PowerBASIC financial simulation written over 40 years by Michael Jenkins, a Harvard-trained lawyer and CPA who retired at 42 to build it. It covers 1,600 companies with stocks, bonds, options, futures, swaps, ETFs, antitrust, and tax accounting based on actual IRS rules. Multiple teams spent years and hundreds of thousands of dollars trying to rewrite it in other languages. None succeeded.
 
-In 2024, [Ben Ward](https://github.com/benstopics) figured out the approach that works: don't rewrite the engine, wrap it. He built a modern Electron/Preact UI that talks to Jenkins' untouched PowerBASIC engine through a C++ REST bridge. The [remaster is on Steam](https://store.steampowered.com/app/3525620/Wall_Street_Raider/). But the game is still chained to a dead 32-bit compiler, which is why PowerBasilisk needs to exist.
+In 2024, [Ben Ward](https://github.com/benstopics) figured out the approach that works: don't rewrite the engine, wrap it. He built a modern Electron/Preact UI that talks to Jenkins' untouched PowerBASIC engine through a C++ REST bridge. The [remaster is on Steam](https://store.steampowered.com/app/3525620/Wall_Street_Raider/).
+
+However, issues began to arise with this approach. The Foreign Function Interface (FFI) layer was complex and brittle, leading to frequent crashes and memory leaks. So Ben built PowerBasilisk, not only in the hopes of running Wall Street Raider in 64-bit and one day on Linux and macOS, but also to develop an automated test harness for Jenkins' codebase to catch regressions and ensure stability as he continues to add features and content.
 
 ## Architecture
 
