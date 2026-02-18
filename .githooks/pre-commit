@@ -1,0 +1,20 @@
+#!/bin/sh
+# Pre-commit hook: runs the same checks as CI (fmt + clippy)
+
+echo "pre-commit: checking formatting..."
+cargo fmt --all -- --check
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "Formatting check failed. Run 'cargo fmt --all' to fix."
+  exit 1
+fi
+
+echo "pre-commit: running clippy..."
+cargo clippy --all-targets -- -D warnings 2>&1
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "Clippy check failed. Fix the warnings above."
+  exit 1
+fi
+
+echo "pre-commit: all checks passed."

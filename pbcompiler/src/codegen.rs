@@ -810,7 +810,7 @@ struct FuncInfo {
     params: Vec<ParamInfo>,
     export: bool,
     is_external: bool, // true if DECLARE LIB (dllimport)
-    is_stdcall: bool, // true if Win32 API (stdcall on 32-bit), false for cdecl
+    is_stdcall: bool,  // true if Win32 API (stdcall on 32-bit), false for cdecl
 }
 
 #[derive(Clone)]
