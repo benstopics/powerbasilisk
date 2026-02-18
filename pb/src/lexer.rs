@@ -180,8 +180,7 @@ impl Lexer {
                             let tok = self.read_octal_literal(start_line, start_col)?;
                             tokens.push(tok);
                         } else {
-                            tokens
-                                .push(self.make_located(Token::Ampersand, start_line, start_col));
+                            tokens.push(self.make_located(Token::Ampersand, start_line, start_col));
                         }
                     } else {
                         tokens.push(self.make_located(Token::Ampersand, start_line, start_col));
@@ -271,7 +270,7 @@ impl Lexer {
                     if self.peek() == Some('.') {
                         self.advance();
                         tokens.push(self.make_located(Token::DotDot, start_line, start_col));
-                    } else if self.peek().map_or(false, |c| c.is_ascii_digit()) {
+                    } else if self.peek().is_some_and(|c| c.is_ascii_digit()) {
                         // .3 → FloatLiteral(0.3) — leading dot float
                         let mut num_str = String::from("0.");
                         while let Some(ch) = self.peek() {
@@ -284,7 +283,11 @@ impl Lexer {
                         }
                         self.consume_numeric_suffix();
                         let val: f64 = num_str.parse().unwrap_or(0.0);
-                        tokens.push(self.make_located(Token::FloatLiteral(val), start_line, start_col));
+                        tokens.push(self.make_located(
+                            Token::FloatLiteral(val),
+                            start_line,
+                            start_col,
+                        ));
                     } else {
                         tokens.push(self.make_located(Token::Dot, start_line, start_col));
                     }
@@ -363,11 +366,7 @@ impl Lexer {
         word
     }
 
-    fn read_string_literal(
-        &mut self,
-        start_line: usize,
-        start_col: usize,
-    ) -> PbResult<Located> {
+    fn read_string_literal(&mut self, start_line: usize, start_col: usize) -> PbResult<Located> {
         self.advance(); // consume opening "
         let mut s = String::new();
         loop {
@@ -442,7 +441,7 @@ impl Lexer {
     fn read_octal_literal(&mut self, start_line: usize, start_col: usize) -> PbResult<Located> {
         let mut oct = String::new();
         while let Some(ch) = self.peek() {
-            if ch >= '0' && ch <= '7' {
+            if ('0'..='7').contains(&ch) {
                 oct.push(ch);
                 self.advance();
             } else {
@@ -665,18 +664,14 @@ mod tests {
         let mut lexer = Lexer::new("PRINT \"hello world\"\n", None);
         let tokens = lexer.tokenize().unwrap();
         assert!(matches!(tokens[0].token, Token::Print));
-        assert!(
-            matches!(tokens[1].token, Token::StringLiteral(ref s) if s == "hello world")
-        );
+        assert!(matches!(tokens[1].token, Token::StringLiteral(ref s) if s == "hello world"));
     }
 
     #[test]
     fn test_hex_literal() {
         let mut lexer = Lexer::new("%X = &H00000004&\n", None);
         let tokens = lexer.tokenize().unwrap();
-        assert!(
-            matches!(tokens[0].token, Token::PercentConstant(ref s) if s == "%X")
-        );
+        assert!(matches!(tokens[0].token, Token::PercentConstant(ref s) if s == "%X"));
         assert!(matches!(tokens[1].token, Token::Eq));
         assert!(matches!(tokens[2].token, Token::IntegerLiteral(4)));
     }

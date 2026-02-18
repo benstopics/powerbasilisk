@@ -10,8 +10,8 @@ pub enum Value {
     Quad(i64),
     Single(f32),
     Double(f64),
-    Ext(f64),       // approximated as f64
-    Currency(i64),  // fixed-point, stored as value * 10000
+    Ext(f64),      // approximated as f64
+    Currency(i64), // fixed-point, stored as value * 10000
     Str(String),
     Null,
 }
@@ -289,8 +289,14 @@ fn promote_numeric(
     float_op: impl Fn(f64, f64) -> f64,
 ) -> Value {
     // If either is floating point, use float arithmetic
-    let a_float = matches!(a, Value::Double(_) | Value::Single(_) | Value::Ext(_) | Value::Currency(_));
-    let b_float = matches!(b, Value::Double(_) | Value::Single(_) | Value::Ext(_) | Value::Currency(_));
+    let a_float = matches!(
+        a,
+        Value::Double(_) | Value::Single(_) | Value::Ext(_) | Value::Currency(_)
+    );
+    let b_float = matches!(
+        b,
+        Value::Double(_) | Value::Single(_) | Value::Ext(_) | Value::Currency(_)
+    );
 
     if a_float || b_float {
         Value::Double(float_op(a.to_f64(), b.to_f64()))

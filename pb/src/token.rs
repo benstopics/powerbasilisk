@@ -6,8 +6,8 @@ pub enum Token {
     StringLiteral(String),
 
     // Identifiers and constants
-    Identifier(String),       // e.g. "Cash", "CoName$", "i&"
-    PercentConstant(String),  // e.g. "%IDYES", "%TRUE"
+    Identifier(String),      // e.g. "Cash", "CoName$", "i&"
+    PercentConstant(String), // e.g. "%IDYES", "%TRUE"
 
     // Keywords
     And,
@@ -17,7 +17,7 @@ pub enum Token {
     Call,
     Case,
     Close,
-    Cur,       // CUR type
+    Cur, // CUR type
     Decr,
     Dim,
     Do,
@@ -105,10 +105,10 @@ pub enum Token {
     RParen,
     Comma,
     Semicolon,
-    Colon,     // : (label marker / statement separator)
-    Hash,      // # (file number prefix)
+    Colon, // : (label marker / statement separator)
+    Hash,  // # (file number prefix)
     Dot,
-    DotDot,    // .. (range in SELECT CASE)
+    DotDot, // .. (range in SELECT CASE)
 
     // Special
     Underscore, // line continuation (shouldn't appear in final tokens)
@@ -128,8 +128,8 @@ pub enum Token {
     Error,
     Macro,
     EndMacro,
-    Replace,   // REPLACE statement
-    Remove,    // REMOVE$ or REMOVE
+    Replace, // REPLACE statement
+    Remove,  // REMOVE$ or REMOVE
     Shared,
     ReDimPreserve, // not a single token, handled in parser
 

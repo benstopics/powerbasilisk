@@ -10,11 +10,11 @@ pub enum PbType {
     Quad,
     Dword,
     Ext,
-    Cur,       // CURRENCY
+    Cur, // CURRENCY
     Byte,
     Word,
     UserDefined(String), // TYPE name
-    Variant,   // untyped / default
+    Variant,             // untyped / default
 }
 
 impl PbType {
@@ -54,9 +54,9 @@ pub enum TopLevel {
 
 #[derive(Debug, Clone)]
 pub struct VarDecl {
-    pub name: String,        // canonical uppercase with suffix
+    pub name: String, // canonical uppercase with suffix
     pub pb_type: PbType,
-    pub is_array: bool,      // declared with ()
+    pub is_array: bool, // declared with ()
     pub line: usize,
 }
 
@@ -65,7 +65,7 @@ pub struct DimStatement {
     pub scope: DimScope,
     pub name: String,
     pub pb_type: PbType,
-    pub bounds: Vec<DimBound>,  // one per dimension
+    pub bounds: Vec<DimBound>, // one per dimension
     pub line: usize,
     pub is_redim: bool,
 }
@@ -75,7 +75,7 @@ pub enum DimScope {
     Local,
     Global,
     Static,
-    Dim,  // plain DIM inside a sub/function
+    Dim, // plain DIM inside a sub/function
 }
 
 #[derive(Debug, Clone)]
@@ -137,11 +137,11 @@ pub struct Param {
 #[derive(Debug, Clone)]
 pub struct DeclareStmt {
     pub name: String,
-    pub is_function: bool,       // true=FUNCTION, false=SUB
+    pub is_function: bool, // true=FUNCTION, false=SUB
     pub params: Vec<Param>,
-    pub return_type: PbType,     // Void for SUB
-    pub lib: Option<String>,     // LIB "dll.dll"
-    pub alias: Option<String>,   // ALIAS "ExternalName"
+    pub return_type: PbType,   // Void for SUB
+    pub lib: Option<String>,   // LIB "dll.dll"
+    pub alias: Option<String>, // ALIAS "ExternalName"
     pub line: usize,
 }
 
@@ -181,7 +181,7 @@ pub enum Statement {
     LineInputFile(LineInputFileStmt),
     Kill(Expr),
     Block(Vec<Statement>), // multiple statements from one parse (e.g. LOCAL a, b)
-    Noop, // for empty stubs, no-ops
+    Noop,                  // for empty stubs, no-ops
 }
 
 #[derive(Debug, Clone)]
@@ -232,7 +232,7 @@ pub struct ForStmt {
 #[derive(Debug, Clone)]
 pub struct DoLoopStmt {
     pub condition: Option<Expr>,
-    pub is_while: bool, // true=WHILE, false=UNTIL
+    pub is_while: bool,    // true=WHILE, false=UNTIL
     pub is_pre_test: bool, // condition at DO vs LOOP
     pub body: Vec<Statement>,
     pub line: usize,
@@ -313,14 +313,14 @@ pub struct CloseStmt {
 #[derive(Debug, Clone)]
 pub struct InputFileStmt {
     pub file_num: Expr,
-    pub vars: Vec<Expr>,  // variables to read into (Variable or ArrayAccess)
+    pub vars: Vec<Expr>, // variables to read into (Variable or ArrayAccess)
     pub line: usize,
 }
 
 #[derive(Debug, Clone)]
 pub struct LineInputFileStmt {
     pub file_num: Expr,
-    pub var: Expr,  // string variable to read into
+    pub var: Expr, // string variable to read into
     pub line: usize,
 }
 
@@ -351,8 +351,8 @@ pub enum Expr {
     BinaryOp(BinaryOp, Box<Expr>, Box<Expr>),
     PercentConst(String),
     Negate(Box<Expr>),
-    Varptr(Box<Expr>),  // VARPTR(variable) or VARPTR(array(idx))
-    ByvalOverride(Box<Expr>),  // BYVAL expr at call site — pass value, not address
+    Varptr(Box<Expr>),        // VARPTR(variable) or VARPTR(array(idx))
+    ByvalOverride(Box<Expr>), // BYVAL expr at call site — pass value, not address
 }
 
 #[derive(Debug, Clone)]

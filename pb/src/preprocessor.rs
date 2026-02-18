@@ -34,6 +34,12 @@ pub struct Preprocessor {
     included: HashSet<PathBuf>,
 }
 
+impl Default for Preprocessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Preprocessor {
     pub fn new() -> Self {
         Preprocessor {
@@ -44,18 +50,16 @@ impl Preprocessor {
 
     /// Process a source file, returning all resolved lines (with includes inlined).
     pub fn process_file(&mut self, path: &Path) -> PbResult<Vec<SourceLine>> {
-        let canonical = std::fs::canonicalize(path).map_err(|e| {
-            PbError::io(format!("Cannot resolve path {}: {}", path.display(), e))
-        })?;
+        let canonical = std::fs::canonicalize(path)
+            .map_err(|e| PbError::io(format!("Cannot resolve path {}: {}", path.display(), e)))?;
 
         if self.included.contains(&canonical) {
             return Ok(Vec::new()); // cycle detection
         }
         self.included.insert(canonical.clone());
 
-        let content = std::fs::read_to_string(&canonical).map_err(|e| {
-            PbError::io(format!("Cannot read {}: {}", canonical.display(), e))
-        })?;
+        let content = std::fs::read_to_string(&canonical)
+            .map_err(|e| PbError::io(format!("Cannot read {}: {}", canonical.display(), e)))?;
 
         self.process_source(&content, &canonical)
     }
@@ -77,7 +81,7 @@ impl Preprocessor {
             // Handle #IF / #ELSEIF / #ELSE / #ENDIF
             let upper = trimmed.to_uppercase();
             if upper.starts_with("#IF ") || upper.starts_with("#IF\t") {
-                let condition = self.evaluate_if_condition(&trimmed[3..].trim());
+                let condition = self.evaluate_if_condition(trimmed[3..].trim());
                 if active {
                     if_stack.push(condition);
                 } else {
@@ -162,7 +166,8 @@ impl Preprocessor {
                 continue;
             }
             // REM comment
-            if trimmed_full.len() >= 3 && trimmed_full[..3].to_uppercase() == "REM"
+            if trimmed_full.len() >= 3
+                && trimmed_full[..3].to_uppercase() == "REM"
                 && (trimmed_full.len() == 3 || !trimmed_full.as_bytes()[3].is_ascii_alphanumeric())
             {
                 i += 1;
@@ -205,11 +210,7 @@ impl Preprocessor {
                             lines.extend(inc_lines);
                         }
                         Err(e) => {
-                            eprintln!(
-                                "Warning: failed to include {}: {}",
-                                resolved.display(),
-                                e
-                            );
+                            eprintln!("Warning: failed to include {}: {}", resolved.display(), e);
                         }
                     }
                 }
@@ -254,8 +255,8 @@ impl Preprocessor {
         let cond = condition.trim().to_uppercase();
 
         // Handle NOT %DEF(%WINAPI) etc.
-        if cond.starts_with("NOT ") {
-            return !self.evaluate_if_condition(&cond[4..]);
+        if let Some(stripped) = cond.strip_prefix("NOT ") {
+            return !self.evaluate_if_condition(stripped);
         }
 
         // Handle %DEF(%CONSTANT)
@@ -285,8 +286,7 @@ impl Preprocessor {
 
         // Hex literal
         if s.starts_with("&H") || s.starts_with("&h") {
-            let hex = s[2..]
-                .trim_end_matches(|c: char| c == '&' || c == '%' || c == '?');
+            let hex = s[2..].trim_end_matches(['&', '%', '?']);
             return i64::from_str_radix(hex, 16).unwrap_or(0);
         }
 
@@ -313,9 +313,9 @@ impl Preprocessor {
 
 fn extract_string(s: &str) -> Option<String> {
     let s = s.trim();
-    if s.starts_with('"') {
-        if let Some(end) = s[1..].find('"') {
-            return Some(s[1..end + 1].to_string());
+    if let Some(stripped) = s.strip_prefix('"') {
+        if let Some(end) = stripped.find('"') {
+            return Some(stripped[..end].to_string());
         }
     }
     None

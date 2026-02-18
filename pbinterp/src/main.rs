@@ -1,6 +1,9 @@
 use std::path::Path;
 use std::process;
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::time::Instant;
 
 use pb::error::PbResult;
@@ -39,8 +42,7 @@ fn main() {
     }
 
     // Parse optional flags
-    let timeout_secs = get_flag_value(&args, "--timeout")
-        .and_then(|s| s.parse::<u64>().ok());
+    let timeout_secs = get_flag_value(&args, "--timeout").and_then(|s| s.parse::<u64>().ok());
     let json_output = get_flag_value(&args, "--json");
     let filter = get_flag_value(&args, "--filter");
 
@@ -184,9 +186,7 @@ fn run_with_timeout(path: &str, timeout_secs: u64) -> PbResult<(i32, String)> {
     let timed_out = Arc::new(AtomicBool::new(false));
     let timed_out_clone = timed_out.clone();
 
-    let handle = std::thread::spawn(move || {
-        run_file(&path_owned)
-    });
+    let handle = std::thread::spawn(move || run_file(&path_owned));
 
     // Wait with timeout
     let timeout = std::time::Duration::from_secs(timeout_secs);
@@ -206,7 +206,10 @@ fn run_with_timeout(path: &str, timeout_secs: u64) -> PbResult<(i32, String)> {
         if start.elapsed() >= timeout {
             timed_out_clone.store(true, Ordering::Relaxed);
             eprintln!("\n!!! TIMEOUT after {}s !!!", timeout_secs);
-            eprintln!("[pbinterp] Test execution exceeded timeout of {}s", timeout_secs);
+            eprintln!(
+                "[pbinterp] Test execution exceeded timeout of {}s",
+                timeout_secs
+            );
             eprintln!("[pbinterp] This usually means a test is stuck in an infinite loop");
             eprintln!("[pbinterp] Check pb_modal_debug.log for the last modal interaction");
             eprintln!("[pbinterp] Check pb_debug.log for the last function call trace");
@@ -290,7 +293,10 @@ fn parse_test_output(stdout: &str, total_duration: f64) -> String {
 
     let status = if failed > 0 { "failed" } else { "passed" };
     let failures_json = failures.join(",");
-    let suites_json: Vec<String> = suites.iter().map(|s| format!(r#""{}""#, s.replace('"', "\\\""))).collect();
+    let suites_json: Vec<String> = suites
+        .iter()
+        .map(|s| format!(r#""{}""#, s.replace('"', "\\\"")))
+        .collect();
 
     format!(
         r#"{{

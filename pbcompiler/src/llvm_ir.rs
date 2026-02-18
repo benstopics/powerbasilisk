@@ -18,9 +18,9 @@ pub enum IrType {
     Float,
     Double,
     Void,
-    Ptr,                          // opaque pointer (LLVM 17+ default)
-    Array(usize, Box<IrType>),    // [N x T]
-    Struct(String),               // named struct reference (%MyType)
+    Ptr,                       // opaque pointer (LLVM 17+ default)
+    Array(usize, Box<IrType>), // [N x T]
+    Struct(String),            // named struct reference (%MyType)
 }
 
 impl std::fmt::Display for IrType {
@@ -47,13 +47,18 @@ impl IrType {
     }
 
     pub fn is_int(&self) -> bool {
-        matches!(self, IrType::I1 | IrType::I8 | IrType::I16 | IrType::I32 | IrType::I64)
+        matches!(
+            self,
+            IrType::I1 | IrType::I8 | IrType::I16 | IrType::I32 | IrType::I64
+        )
     }
 
+    #[allow(dead_code)]
     pub fn is_array(&self) -> bool {
         matches!(self, IrType::Array(..))
     }
 
+    #[allow(dead_code)]
     pub fn is_struct(&self) -> bool {
         matches!(self, IrType::Struct(..))
     }
@@ -134,7 +139,13 @@ impl ModuleBuilder {
     }
 
     /// Declare an external function.
-    pub fn declare_function(&mut self, name: &str, ret: &IrType, params: &[IrType], variadic: bool) {
+    pub fn declare_function(
+        &mut self,
+        name: &str,
+        ret: &IrType,
+        params: &[IrType],
+        variadic: bool,
+    ) {
         if !self.declared.insert(name.to_string()) {
             return; // already declared
         }
@@ -162,9 +173,23 @@ impl ModuleBuilder {
         }
         let params_str: Vec<String> = params.iter().map(|t| t.to_string()).collect();
         if self.is_32bit() {
-            writeln!(self.globals, "declare dllimport x86_stdcallcc {} @{}({})", ret, name, params_str.join(", ")).unwrap();
+            writeln!(
+                self.globals,
+                "declare dllimport x86_stdcallcc {} @{}({})",
+                ret,
+                name,
+                params_str.join(", ")
+            )
+            .unwrap();
         } else {
-            writeln!(self.globals, "declare dllimport {} @{}({})", ret, name, params_str.join(", ")).unwrap();
+            writeln!(
+                self.globals,
+                "declare dllimport {} @{}({})",
+                ret,
+                name,
+                params_str.join(", ")
+            )
+            .unwrap();
         }
     }
 
@@ -174,7 +199,14 @@ impl ModuleBuilder {
             return; // already declared
         }
         let params_str: Vec<String> = params.iter().map(|t| t.to_string()).collect();
-        writeln!(self.globals, "declare dllimport {} @{}({})", ret, name, params_str.join(", ")).unwrap();
+        writeln!(
+            self.globals,
+            "declare dllimport {} @{}({})",
+            ret,
+            name,
+            params_str.join(", ")
+        )
+        .unwrap();
     }
 
     /// Declare an LLVM intrinsic.
@@ -185,7 +217,13 @@ impl ModuleBuilder {
     /// Define a named struct type: `%name = type { field_types... }`
     pub fn define_struct_type(&mut self, name: &str, field_types: &[IrType]) {
         let fields_str: Vec<String> = field_types.iter().map(|t| t.to_string()).collect();
-        writeln!(self.globals, "%{} = type {{ {} }}", name, fields_str.join(", ")).unwrap();
+        writeln!(
+            self.globals,
+            "%{} = type {{ {} }}",
+            name,
+            fields_str.join(", ")
+        )
+        .unwrap();
     }
 
     /// Add a global variable.
@@ -203,7 +241,7 @@ impl ModuleBuilder {
         let name = format!(".str.{}", self.str_counter);
         self.str_counter += 1;
         let len = value.len() + 1; // +1 for null terminator
-        // Escape special characters for LLVM IR string
+                                   // Escape special characters for LLVM IR string
         let escaped = llvm_escape_string(value);
         writeln!(
             self.globals,
@@ -274,18 +312,19 @@ pub struct FunctionBuilder {
 }
 
 impl FunctionBuilder {
-    fn new(
-        name: &str,
-        ret: &IrType,
-        params: &[(String, IrType)],
-        export: bool,
-    ) -> Self {
+    fn new(name: &str, ret: &IrType, params: &[(String, IrType)], export: bool) -> Self {
         let params_str: Vec<String> = params
             .iter()
             .map(|(n, t)| format!("{} %{}", t, n))
             .collect();
         let export_attr = if export { "dllexport " } else { "" };
-        let header = format!("define {}{} @{}({}) {{\n", export_attr, ret, name, params_str.join(", "));
+        let header = format!(
+            "define {}{} @{}({}) {{\n",
+            export_attr,
+            ret,
+            name,
+            params_str.join(", ")
+        );
         let mut fb = FunctionBuilder {
             body: header,
             allocas: String::new(),
@@ -403,7 +442,12 @@ impl FunctionBuilder {
     /// `%r = inttoptr i32 %val to ptr` (32-bit target)
     pub fn inttoptr(&mut self, val: &Val) -> Val {
         let r = self.next_reg();
-        writeln!(self.body, "  {} = inttoptr {} {} to ptr", r, val.ty, val.name).unwrap();
+        writeln!(
+            self.body,
+            "  {} = inttoptr {} {} to ptr",
+            r, val.ty, val.name
+        )
+        .unwrap();
         Val::new(r, IrType::Ptr)
     }
 
@@ -526,14 +570,24 @@ impl FunctionBuilder {
     /// Integer comparison. Returns i1.
     pub fn icmp(&mut self, pred: &str, a: &Val, b: &Val) -> Val {
         let r = self.next_reg();
-        writeln!(self.body, "  {} = icmp {} {} {}, {}", r, pred, a.ty, a.name, b.name).unwrap();
+        writeln!(
+            self.body,
+            "  {} = icmp {} {} {}, {}",
+            r, pred, a.ty, a.name, b.name
+        )
+        .unwrap();
         Val::new(r, IrType::I1)
     }
 
     /// Float comparison. Returns i1.
     pub fn fcmp(&mut self, pred: &str, a: &Val, b: &Val) -> Val {
         let r = self.next_reg();
-        writeln!(self.body, "  {} = fcmp {} {} {}, {}", r, pred, a.ty, a.name, b.name).unwrap();
+        writeln!(
+            self.body,
+            "  {} = fcmp {} {} {}, {}",
+            r, pred, a.ty, a.name, b.name
+        )
+        .unwrap();
         Val::new(r, IrType::I1)
     }
 
@@ -542,49 +596,84 @@ impl FunctionBuilder {
     /// Sign-extend integer to wider type.
     pub fn sext(&mut self, val: &Val, to: &IrType) -> Val {
         let r = self.next_reg();
-        writeln!(self.body, "  {} = sext {} {} to {}", r, val.ty, val.name, to).unwrap();
+        writeln!(
+            self.body,
+            "  {} = sext {} {} to {}",
+            r, val.ty, val.name, to
+        )
+        .unwrap();
         Val::new(r, to.clone())
     }
 
     /// Truncate integer to narrower type.
     pub fn trunc(&mut self, val: &Val, to: &IrType) -> Val {
         let r = self.next_reg();
-        writeln!(self.body, "  {} = trunc {} {} to {}", r, val.ty, val.name, to).unwrap();
+        writeln!(
+            self.body,
+            "  {} = trunc {} {} to {}",
+            r, val.ty, val.name, to
+        )
+        .unwrap();
         Val::new(r, to.clone())
     }
 
     /// Float extend (e.g. float → double).
     pub fn fpext(&mut self, val: &Val, to: &IrType) -> Val {
         let r = self.next_reg();
-        writeln!(self.body, "  {} = fpext {} {} to {}", r, val.ty, val.name, to).unwrap();
+        writeln!(
+            self.body,
+            "  {} = fpext {} {} to {}",
+            r, val.ty, val.name, to
+        )
+        .unwrap();
         Val::new(r, to.clone())
     }
 
     /// Float truncate (e.g. double → float).
     pub fn fptrunc(&mut self, val: &Val, to: &IrType) -> Val {
         let r = self.next_reg();
-        writeln!(self.body, "  {} = fptrunc {} {} to {}", r, val.ty, val.name, to).unwrap();
+        writeln!(
+            self.body,
+            "  {} = fptrunc {} {} to {}",
+            r, val.ty, val.name, to
+        )
+        .unwrap();
         Val::new(r, to.clone())
     }
 
     /// Signed int to float.
     pub fn sitofp(&mut self, val: &Val, to: &IrType) -> Val {
         let r = self.next_reg();
-        writeln!(self.body, "  {} = sitofp {} {} to {}", r, val.ty, val.name, to).unwrap();
+        writeln!(
+            self.body,
+            "  {} = sitofp {} {} to {}",
+            r, val.ty, val.name, to
+        )
+        .unwrap();
         Val::new(r, to.clone())
     }
 
     /// Float to signed int.
     pub fn fptosi(&mut self, val: &Val, to: &IrType) -> Val {
         let r = self.next_reg();
-        writeln!(self.body, "  {} = fptosi {} {} to {}", r, val.ty, val.name, to).unwrap();
+        writeln!(
+            self.body,
+            "  {} = fptosi {} {} to {}",
+            r, val.ty, val.name, to
+        )
+        .unwrap();
         Val::new(r, to.clone())
     }
 
     /// Zero-extend i1 to wider integer.
     pub fn zext(&mut self, val: &Val, to: &IrType) -> Val {
         let r = self.next_reg();
-        writeln!(self.body, "  {} = zext {} {} to {}", r, val.ty, val.name, to).unwrap();
+        writeln!(
+            self.body,
+            "  {} = zext {} {} to {}",
+            r, val.ty, val.name, to
+        )
+        .unwrap();
         Val::new(r, to.clone())
     }
 
@@ -672,7 +761,13 @@ impl FunctionBuilder {
     /// Call a void function with x86_stdcallcc convention (Win32 API on 32-bit).
     pub fn call_void_stdcall(&mut self, name: &str, args: &[Val]) {
         let args_str: Vec<String> = args.iter().map(|a| a.typed()).collect();
-        writeln!(self.body, "  call x86_stdcallcc void @{}({})", name, args_str.join(", ")).unwrap();
+        writeln!(
+            self.body,
+            "  call x86_stdcallcc void @{}({})",
+            name,
+            args_str.join(", ")
+        )
+        .unwrap();
     }
 
     /// Call a function that returns a value.
@@ -743,10 +838,12 @@ impl FunctionBuilder {
         Val::new(val.to_string(), IrType::I32)
     }
 
+    #[allow(dead_code)]
     pub fn const_i64(&self, val: i64) -> Val {
         Val::new(val.to_string(), IrType::I64)
     }
 
+    #[allow(dead_code)]
     pub fn const_i16(&self, val: i16) -> Val {
         Val::new(val.to_string(), IrType::I16)
     }
@@ -760,6 +857,7 @@ impl FunctionBuilder {
         Val::new(format_f64_hex(val), IrType::Double)
     }
 
+    #[allow(dead_code)]
     pub fn const_f32(&self, val: f32) -> Val {
         Val::new(format_f64_hex(val as f64), IrType::Float)
     }
@@ -774,11 +872,11 @@ impl FunctionBuilder {
 
     // ===== Inline comment =====
 
+    #[allow(dead_code)]
     pub fn comment(&mut self, text: &str) {
         writeln!(self.body, "  ; {}", text).unwrap();
     }
 }
-
 
 /// Format f64 as LLVM IR hex float literal.
 /// LLVM IR uses `0xHHHHHHHHHHHHHHHH` format for exact IEEE 754 representation.

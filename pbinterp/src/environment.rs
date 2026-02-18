@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use pb::ast::PbType;
 use crate::value::Value;
+use pb::ast::PbType;
 
 /// Strip type suffix from a variable name to find the base name.
 /// In PB, `Cash#` and `Cash` refer to the same variable; `StockOwned%` and `StockOwned` too.
@@ -127,6 +127,12 @@ pub struct OpenFile {
     pub content: String, // buffer for output
 }
 
+impl Default for Environment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Environment {
     pub fn new() -> Self {
         Environment {
@@ -173,15 +179,18 @@ impl Environment {
 
         // Check if it exists in locals
         if let Some(frame) = self.call_stack.last_mut() {
-            if frame.locals.contains_key(&key) {
-                frame.locals.insert(key, value);
+            if let std::collections::hash_map::Entry::Occupied(mut e) =
+                frame.locals.entry(key.clone())
+            {
+                e.insert(value);
                 return;
             }
         }
 
         // Check globals
-        if self.globals.contains_key(&key) {
-            self.globals.insert(key, value);
+        if let std::collections::hash_map::Entry::Occupied(mut e) = self.globals.entry(key.clone())
+        {
+            e.insert(value);
             return;
         }
 
@@ -214,28 +223,29 @@ impl Environment {
     /// Declare a global variable (name is normalized)
     pub fn declare_global(&mut self, name: &str, pb_type: &PbType) {
         let key = normalize(name);
-        if !self.globals.contains_key(&key) {
-            self.globals.insert(key, Value::default_for_type(pb_type));
-        }
+        self.globals
+            .entry(key)
+            .or_insert_with(|| Value::default_for_type(pb_type));
     }
 
     /// Declare a global array (empty, to be DIMed later; name is normalized)
     pub fn declare_global_array(&mut self, name: &str, _pb_type: &PbType) {
         let key = normalize(name);
-        if !self.global_arrays.contains_key(&key) {
-            self.global_arrays.insert(
-                key,
-                ArrayDesc {
-                    dims: Vec::new(),
-                    data: Vec::new(),
-                    elem_type: _pb_type.clone(),
-                },
-            );
-        }
+        self.global_arrays.entry(key).or_insert_with(|| ArrayDesc {
+            dims: Vec::new(),
+            data: Vec::new(),
+            elem_type: _pb_type.clone(),
+        });
     }
 
     /// DIM an array with bounds (name is normalized)
-    pub fn dim_array(&mut self, name: &str, dims: Vec<(i64, i64)>, pb_type: &PbType, is_local: bool) {
+    pub fn dim_array(
+        &mut self,
+        name: &str,
+        dims: Vec<(i64, i64)>,
+        pb_type: &PbType,
+        is_local: bool,
+    ) {
         let key = normalize(name);
         let arr = ArrayDesc::new(dims, pb_type);
 
@@ -255,8 +265,10 @@ impl Environment {
 
         // Check locals first
         if let Some(frame) = self.call_stack.last_mut() {
-            if frame.local_arrays.contains_key(&key) {
-                frame.local_arrays.insert(key, arr);
+            if let std::collections::hash_map::Entry::Occupied(mut e) =
+                frame.local_arrays.entry(key.clone())
+            {
+                e.insert(arr);
                 return;
             }
         }
@@ -298,7 +310,6 @@ impl Environment {
         // Check global arrays
         if let Some(arr) = self.global_arrays.get_mut(&key) {
             arr.set(indices, value);
-            return;
         }
     }
 
@@ -355,9 +366,7 @@ fn type_from_name(name: &str) -> PbType {
         PbType::Integer
     } else if upper.ends_with('!') {
         PbType::Single
-    } else if upper.ends_with("@@") {
-        PbType::Cur
-    } else if upper.ends_with('@') {
+    } else if upper.ends_with("@@") || upper.ends_with('@') {
         PbType::Cur
     } else if upper.ends_with('$') {
         PbType::String

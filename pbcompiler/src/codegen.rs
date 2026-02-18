@@ -13,14 +13,19 @@ pub struct CompileOptions {
     pub exe_mode: bool,
     pub session_mode: bool,
     pub emit_llvm: bool,
-    pub debug_mode: bool,            // enable verbose debug logging (modal text, assertions)
-    pub runtime_lib: Option<String>,  // path to pb_runtime.obj
-    pub lib_dir: Option<String>,      // path to directory containing ui.lib
-    pub split_threshold: usize,       // split functions exceeding this many IR lines (0 = disabled)
+    pub debug_mode: bool, // enable verbose debug logging (modal text, assertions)
+    pub runtime_lib: Option<String>, // path to pb_runtime.obj
+    pub lib_dir: Option<String>, // path to directory containing ui.lib
+    pub split_threshold: usize, // split functions exceeding this many IR lines (0 = disabled)
 }
 
 /// Compile a parsed PB program to LLVM IR, then optionally to object code via clang.
-pub fn compile(program: &Program, output_path: &Path, opts: &CompileOptions, pp_constants: &HashMap<String, i64>) -> PbResult<()> {
+pub fn compile(
+    program: &Program,
+    output_path: &Path,
+    opts: &CompileOptions,
+    pp_constants: &HashMap<String, i64>,
+) -> PbResult<()> {
     let mut compiler = Compiler::new();
     compiler.session_mode = opts.session_mode;
     compiler.debug_mode = opts.debug_mode;
@@ -33,14 +38,22 @@ pub fn compile(program: &Program, output_path: &Path, opts: &CompileOptions, pp_
     let ll_path = output_path.with_extension("ll");
     std::fs::write(&ll_path, &ir)
         .map_err(|e| PbError::io(format!("Failed to write .ll: {}", e)))?;
-    eprintln!("[pbcompiler] Wrote LLVM IR: {} ({} lines)", ll_path.display(), ir.lines().count());
+    eprintln!(
+        "[pbcompiler] Wrote LLVM IR: {} ({} lines)",
+        ll_path.display(),
+        ir.lines().count()
+    );
 
     if opts.emit_llvm {
         return Ok(());
     }
 
     // Split large functions if threshold is set
-    let threshold = if opts.split_threshold > 0 { opts.split_threshold } else { 20000 };
+    let threshold = if opts.split_threshold > 0 {
+        opts.split_threshold
+    } else {
+        20000
+    };
     let (main_ir, split_ir) = split_large_functions(&ir, threshold);
 
     let mut obj_paths: Vec<std::path::PathBuf> = Vec::new();
@@ -54,18 +67,27 @@ pub fn compile(program: &Program, output_path: &Path, opts: &CompileOptions, pp_
         let main_obj_path = output_path.with_extension("main.obj");
         // Use -O0 to avoid clang 17.0.1 crashes (Register Coalescer, DAG ISel)
         compile_with_clang(&main_ll_path, &main_obj_path, "-O0")?;
-        eprintln!("[pbcompiler] Wrote main object: {}", main_obj_path.display());
+        eprintln!(
+            "[pbcompiler] Wrote main object: {}",
+            main_obj_path.display()
+        );
         obj_paths.push(main_obj_path);
 
         // Write and compile the split .ll (large functions only)
         let split_ll_path = output_path.with_extension("split.ll");
         std::fs::write(&split_ll_path, split_ir.as_ref().unwrap())
             .map_err(|e| PbError::io(format!("Failed to write split .ll: {}", e)))?;
-        eprintln!("[pbcompiler] Split large functions to: {}", split_ll_path.display());
+        eprintln!(
+            "[pbcompiler] Split large functions to: {}",
+            split_ll_path.display()
+        );
 
         let split_obj_path = output_path.with_extension("split.obj");
         compile_split_module(&split_ll_path, &split_obj_path)?;
-        eprintln!("[pbcompiler] Wrote split object: {}", split_obj_path.display());
+        eprintln!(
+            "[pbcompiler] Wrote split object: {}",
+            split_obj_path.display()
+        );
         obj_paths.push(split_obj_path);
     } else {
         // No split needed — compile as one unit
@@ -121,10 +143,12 @@ fn compile_split_module(ll_path: &Path, obj_path: &Path) -> PbResult<()> {
     eprintln!("[pbcompiler] Compiling split module with -O1...");
     let result = std::process::Command::new("clang")
         .args([
-            "-c", "-O1",
+            "-c",
+            "-O1",
             "--target=i686-pc-windows-msvc",
             &ll_path.to_string_lossy(),
-            "-o", &obj_path.to_string_lossy(),
+            "-o",
+            &obj_path.to_string_lossy(),
         ])
         .output();
 
@@ -138,11 +162,14 @@ fn compile_split_module(ll_path: &Path, obj_path: &Path) -> PbResult<()> {
     eprintln!("[pbcompiler] -O1 failed, trying -O0 -mllvm -fast-isel...");
     let result = std::process::Command::new("clang")
         .args([
-            "-c", "-O0",
-            "-mllvm", "-fast-isel",
+            "-c",
+            "-O0",
+            "-mllvm",
+            "-fast-isel",
             "--target=i686-pc-windows-msvc",
             &ll_path.to_string_lossy(),
-            "-o", &obj_path.to_string_lossy(),
+            "-o",
+            &obj_path.to_string_lossy(),
         ])
         .output();
 
@@ -156,10 +183,12 @@ fn compile_split_module(ll_path: &Path, obj_path: &Path) -> PbResult<()> {
     eprintln!("[pbcompiler] fast-isel failed, trying plain -O0...");
     let result = std::process::Command::new("clang")
         .args([
-            "-c", "-O0",
+            "-c",
+            "-O0",
             "--target=i686-pc-windows-msvc",
             &ll_path.to_string_lossy(),
-            "-o", &obj_path.to_string_lossy(),
+            "-o",
+            &obj_path.to_string_lossy(),
         ])
         .output();
 
@@ -239,10 +268,17 @@ fn generate_stub_module(original_ll: &Path, obj_path: &Path) -> PbResult<()> {
                 "unknown"
             };
 
-            eprintln!("[pbcompiler] Stubbing function: {} (returns {})", name, ret_type);
+            eprintln!(
+                "[pbcompiler] Stubbing function: {} (returns {})",
+                name, ret_type
+            );
 
             // Emit stub: strip param names for the define
-            let export = if line.contains("dllexport") { "dllexport " } else { "" };
+            let export = if line.contains("dllexport") {
+                "dllexport "
+            } else {
+                ""
+            };
 
             // Get the parameter part
             if let (Some(open), Some(close)) = (line.rfind('('), line.rfind(')')) {
@@ -298,9 +334,7 @@ fn link_dll(obj_path: &Path, dll_path: &Path) -> PbResult<()> {
 
 /// Link object files into an executable.
 fn link_exe(obj_paths: &[&Path], exe_path: &Path, opts: &CompileOptions) -> PbResult<()> {
-    let mut args: Vec<String> = vec![
-        "--target=i686-pc-windows-msvc".to_string(),
-    ];
+    let mut args: Vec<String> = vec!["--target=i686-pc-windows-msvc".to_string()];
 
     // Add all object files
     for obj in obj_paths {
@@ -380,8 +414,8 @@ fn split_large_functions(ir: &str, threshold: usize) -> (String, Option<String>)
     struct FnRange {
         start: usize,
         end: usize,       // inclusive (the "}" line)
-        sig_line: String,  // the "define ..." line
-        name: String,      // @FunctionName
+        sig_line: String, // the "define ..." line
+        name: String,     // @FunctionName
     }
 
     let mut fn_ranges: Vec<FnRange> = Vec::new();
@@ -410,13 +444,20 @@ fn split_large_functions(ir: &str, threshold: usize) -> (String, Option<String>)
             }
             let end = i; // the "}" line
 
-            fn_ranges.push(FnRange { start, end, sig_line, name });
+            fn_ranges.push(FnRange {
+                start,
+                end,
+                sig_line,
+                name,
+            });
         }
         i += 1;
     }
 
     // Find functions exceeding threshold
-    let large_fn_indices: Vec<usize> = fn_ranges.iter().enumerate()
+    let large_fn_indices: Vec<usize> = fn_ranges
+        .iter()
+        .enumerate()
         .filter(|(_, fr)| fr.end - fr.start > threshold)
         .map(|(idx, _)| idx)
         .collect();
@@ -425,12 +466,15 @@ fn split_large_functions(ir: &str, threshold: usize) -> (String, Option<String>)
         return (ir.to_string(), None);
     }
 
-    let large_names: Vec<&str> = large_fn_indices.iter()
+    let large_names: Vec<&str> = large_fn_indices
+        .iter()
         .map(|&idx| fn_ranges[idx].name.as_str())
         .collect();
-    eprintln!("[pbcompiler] Splitting {} large function(s): {}",
+    eprintln!(
+        "[pbcompiler] Splitting {} large function(s): {}",
         large_names.len(),
-        large_names.join(", "));
+        large_names.join(", ")
+    );
 
     // Build a set of line ranges to exclude from the main module
     let mut exclude_ranges: Vec<(usize, usize)> = Vec::new();
@@ -529,7 +573,8 @@ fn split_large_functions(ir: &str, threshold: usize) -> (String, Option<String>)
     // (private unnamed_addr constants) - these need to be in the split module
     // Actually, string constants are private so they can't be cross-referenced.
     // We need to copy them into the split module too.
-    let large_fn_text: Vec<&str> = large_fn_indices.iter()
+    let large_fn_text: Vec<&str> = large_fn_indices
+        .iter()
         .flat_map(|&idx| {
             let fr = &fn_ranges[idx];
             &lines[fr.start..=fr.end]
@@ -572,8 +617,8 @@ fn split_large_functions(ir: &str, threshold: usize) -> (String, Option<String>)
     // Copy large function definitions
     for &idx in &large_fn_indices {
         let fr = &fn_ranges[idx];
-        for line_idx in fr.start..=fr.end {
-            split_lines.push(lines[line_idx].to_string());
+        for line in &lines[fr.start..=fr.end] {
+            split_lines.push(line.to_string());
         }
         split_lines.push(String::new());
     }
@@ -605,7 +650,8 @@ fn fn_define_to_declare(define_line: &str) -> String {
         let params_str = &rest[open + 1..close];
 
         // Strip parameter names
-        let stripped_params: Vec<&str> = params_str.split(',')
+        let stripped_params: Vec<&str> = params_str
+            .split(',')
             .map(|p| {
                 let p = p.trim();
                 if p.is_empty() {
@@ -717,13 +763,13 @@ struct Compiler {
 
 /// Tracks a global variable or array that will become a session struct field.
 struct SessionFieldInfo {
-    name: String,           // normalized global name
-    ir_type: IrType,        // field IR type (scalar or array type)
-    pb_type: PbType,        // PB type
+    name: String,    // normalized global name
+    ir_type: IrType, // field IR type (scalar or array type)
+    pb_type: PbType, // PB type
     is_array: bool,
-    elem_ir_type: Option<IrType>,           // for arrays: element type
-    array_dims: Option<Vec<(i64, i64)>>,    // for arrays: (lower_bound, count) per dim
-    total_elements: Option<usize>,          // for arrays: total element count
+    elem_ir_type: Option<IrType>,        // for arrays: element type
+    array_dims: Option<Vec<(i64, i64)>>, // for arrays: (lower_bound, count) per dim
+    total_elements: Option<usize>,       // for arrays: total element count
 }
 
 /// Tracks GOSUB/RETURN info for one function's compilation.
@@ -738,6 +784,7 @@ struct GosubContext {
     emitted_labels: HashSet<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 struct FuncInfo {
     ir_name: String,
@@ -764,14 +811,15 @@ struct LoopInfo {
 }
 
 /// Layout of a user-defined TYPE (struct).
+#[allow(dead_code)]
 struct TypeLayout {
-    ir_name: String,                    // normalized TYPE name
-    fields: Vec<FieldInfo>,             // ordered fields
-    field_map: HashMap<String, usize>,  // normalized field name → index
+    ir_name: String,                   // normalized TYPE name
+    fields: Vec<FieldInfo>,            // ordered fields
+    field_map: HashMap<String, usize>, // normalized field name → index
 }
 
+#[allow(dead_code)]
 struct FieldInfo {
-    #[allow(dead_code)]
     name: String,
     pb_type: PbType,
     ir_type: IrType,
@@ -790,11 +838,31 @@ impl Compiler {
         let name = lib_name.trim_end_matches(".DLL").trim_end_matches(".dll");
         matches!(
             name,
-            "KERNEL32" | "USER32" | "GDI32" | "COMCTL32" | "COMDLG32"
-                | "SHELL32" | "OLEAUT32" | "OLE32" | "ADVAPI32" | "WINMM"
-                | "WS2_32" | "WSOCK32" | "NETAPI32" | "SHLWAPI" | "VERSION"
-                | "WININET" | "WINSPOOL" | "MAPI32" | "PSAPI" | "SETUPAPI"
-                | "IPHLPAPI" | "SECUR32" | "CRYPT32" | "MPR" | "DBGHELP"
+            "KERNEL32"
+                | "USER32"
+                | "GDI32"
+                | "COMCTL32"
+                | "COMDLG32"
+                | "SHELL32"
+                | "OLEAUT32"
+                | "OLE32"
+                | "ADVAPI32"
+                | "WINMM"
+                | "WS2_32"
+                | "WSOCK32"
+                | "NETAPI32"
+                | "SHLWAPI"
+                | "VERSION"
+                | "WININET"
+                | "WINSPOOL"
+                | "MAPI32"
+                | "PSAPI"
+                | "SETUPAPI"
+                | "IPHLPAPI"
+                | "SECUR32"
+                | "CRYPT32"
+                | "MPR"
+                | "DBGHELP"
         )
     }
 
@@ -852,90 +920,225 @@ impl Compiler {
     }
 
     fn is_float_pb(pb_type: &PbType) -> bool {
-        matches!(pb_type, PbType::Double | PbType::Single | PbType::Ext | PbType::Cur)
+        matches!(
+            pb_type,
+            PbType::Double | PbType::Single | PbType::Ext | PbType::Cur
+        )
     }
 
     // ========== Top-level compilation ==========
 
     fn compile_program(&mut self, program: &Program) -> PbResult<()> {
         // Declare printf
-        self.module.declare_function("printf", &IrType::I32, &[IrType::Ptr], true);
+        self.module
+            .declare_function("printf", &IrType::I32, &[IrType::Ptr], true);
 
         // LLVM intrinsics for math
-        self.module.declare_intrinsic("llvm.pow.f64", &IrType::Double, &[IrType::Double, IrType::Double]);
-        self.module.declare_intrinsic("llvm.fabs.f64", &IrType::Double, &[IrType::Double]);
-        self.module.declare_intrinsic("llvm.floor.f64", &IrType::Double, &[IrType::Double]);
-        self.module.declare_intrinsic("llvm.ceil.f64", &IrType::Double, &[IrType::Double]);
-        self.module.declare_intrinsic("llvm.sqrt.f64", &IrType::Double, &[IrType::Double]);
-        self.module.declare_intrinsic("llvm.round.f64", &IrType::Double, &[IrType::Double]);
-        self.module.declare_intrinsic("llvm.log.f64", &IrType::Double, &[IrType::Double]);
-        self.module.declare_intrinsic("llvm.exp.f64", &IrType::Double, &[IrType::Double]);
-        self.module.declare_intrinsic("llvm.sin.f64", &IrType::Double, &[IrType::Double]);
-        self.module.declare_intrinsic("llvm.cos.f64", &IrType::Double, &[IrType::Double]);
+        self.module.declare_intrinsic(
+            "llvm.pow.f64",
+            &IrType::Double,
+            &[IrType::Double, IrType::Double],
+        );
+        self.module
+            .declare_intrinsic("llvm.fabs.f64", &IrType::Double, &[IrType::Double]);
+        self.module
+            .declare_intrinsic("llvm.floor.f64", &IrType::Double, &[IrType::Double]);
+        self.module
+            .declare_intrinsic("llvm.ceil.f64", &IrType::Double, &[IrType::Double]);
+        self.module
+            .declare_intrinsic("llvm.sqrt.f64", &IrType::Double, &[IrType::Double]);
+        self.module
+            .declare_intrinsic("llvm.round.f64", &IrType::Double, &[IrType::Double]);
+        self.module
+            .declare_intrinsic("llvm.log.f64", &IrType::Double, &[IrType::Double]);
+        self.module
+            .declare_intrinsic("llvm.exp.f64", &IrType::Double, &[IrType::Double]);
+        self.module
+            .declare_intrinsic("llvm.sin.f64", &IrType::Double, &[IrType::Double]);
+        self.module
+            .declare_intrinsic("llvm.cos.f64", &IrType::Double, &[IrType::Double]);
 
         // C math library (no LLVM intrinsic)
-        self.module.declare_function("tan", &IrType::Double, &[IrType::Double], false);
-        self.module.declare_function("atan", &IrType::Double, &[IrType::Double], false);
+        self.module
+            .declare_function("tan", &IrType::Double, &[IrType::Double], false);
+        self.module
+            .declare_function("atan", &IrType::Double, &[IrType::Double], false);
 
         // C stdlib for RND
-        self.module.declare_function("rand", &IrType::I32, &[], false);
+        self.module
+            .declare_function("rand", &IrType::I32, &[], false);
 
         // PB runtime library (pb_runtime.c)
-        self.module.declare_function("pb_format", &IrType::Ptr, &[IrType::Double, IrType::Ptr], false);
-        self.module.declare_function("pb_parse", &IrType::Ptr, &[IrType::Ptr, IrType::Ptr, IrType::I32], false);
-        self.module.declare_function("pb_parsecount", &IrType::I32, &[IrType::Ptr, IrType::Ptr], false);
-        self.module.declare_function("pb_replace", &IrType::Void, &[IrType::Ptr, IrType::Ptr, IrType::Ptr], false);
-        self.module.declare_function("pb_remove", &IrType::Ptr, &[IrType::Ptr, IrType::Ptr], false);
-        self.module.declare_function("pb_using", &IrType::Ptr, &[IrType::Ptr, IrType::Double], false);
+        self.module.declare_function(
+            "pb_format",
+            &IrType::Ptr,
+            &[IrType::Double, IrType::Ptr],
+            false,
+        );
+        self.module.declare_function(
+            "pb_parse",
+            &IrType::Ptr,
+            &[IrType::Ptr, IrType::Ptr, IrType::I32],
+            false,
+        );
+        self.module.declare_function(
+            "pb_parsecount",
+            &IrType::I32,
+            &[IrType::Ptr, IrType::Ptr],
+            false,
+        );
+        self.module.declare_function(
+            "pb_replace",
+            &IrType::Void,
+            &[IrType::Ptr, IrType::Ptr, IrType::Ptr],
+            false,
+        );
+        self.module.declare_function(
+            "pb_remove",
+            &IrType::Ptr,
+            &[IrType::Ptr, IrType::Ptr],
+            false,
+        );
+        self.module.declare_function(
+            "pb_using",
+            &IrType::Ptr,
+            &[IrType::Ptr, IrType::Double],
+            false,
+        );
 
         // oleaut32: BSTR allocation for bridge compatibility
-        self.module.declare_function("pb_bstr_alloc", &IrType::Ptr, &[IrType::Ptr, IrType::I32], false);
-        self.module.declare_function("pb_bstr_free", &IrType::Void, &[IrType::Ptr], false);
-        self.module.declare_function("pb_str_concat", &IrType::Ptr, &[IrType::Ptr, IrType::Ptr], false);
+        self.module.declare_function(
+            "pb_bstr_alloc",
+            &IrType::Ptr,
+            &[IrType::Ptr, IrType::I32],
+            false,
+        );
+        self.module
+            .declare_function("pb_bstr_free", &IrType::Void, &[IrType::Ptr], false);
+        self.module.declare_function(
+            "pb_str_concat",
+            &IrType::Ptr,
+            &[IrType::Ptr, IrType::Ptr],
+            false,
+        );
 
         // File I/O runtime
-        self.module.declare_function("pb_freefile", &IrType::I32, &[], false);
-        self.module.declare_function("pb_open", &IrType::I32, &[IrType::Ptr, IrType::I32, IrType::I32], false);
-        self.module.declare_function("pb_close", &IrType::Void, &[IrType::I32], false);
-        self.module.declare_function("pb_print_file", &IrType::Void, &[IrType::I32, IrType::Ptr], false);
-        self.module.declare_function("pb_print_file_newline", &IrType::Void, &[IrType::I32], false);
-        self.module.declare_function("pb_line_input", &IrType::Ptr, &[IrType::I32], false);
-        self.module.declare_function("pb_eof", &IrType::I32, &[IrType::I32], false);
-        self.module.declare_function("pb_input_file_str", &IrType::Void, &[IrType::I32, IrType::Ptr], false);
-        self.module.declare_function("pb_input_file_int", &IrType::Void, &[IrType::I32, IrType::Ptr], false);
-        self.module.declare_function("pb_input_file_dbl", &IrType::Void, &[IrType::I32, IrType::Ptr], false);
-        self.module.declare_function("pb_kill", &IrType::Void, &[IrType::Ptr], false);
+        self.module
+            .declare_function("pb_freefile", &IrType::I32, &[], false);
+        self.module.declare_function(
+            "pb_open",
+            &IrType::I32,
+            &[IrType::Ptr, IrType::I32, IrType::I32],
+            false,
+        );
+        self.module
+            .declare_function("pb_close", &IrType::Void, &[IrType::I32], false);
+        self.module.declare_function(
+            "pb_print_file",
+            &IrType::Void,
+            &[IrType::I32, IrType::Ptr],
+            false,
+        );
+        self.module.declare_function(
+            "pb_print_file_newline",
+            &IrType::Void,
+            &[IrType::I32],
+            false,
+        );
+        self.module
+            .declare_function("pb_line_input", &IrType::Ptr, &[IrType::I32], false);
+        self.module
+            .declare_function("pb_eof", &IrType::I32, &[IrType::I32], false);
+        self.module.declare_function(
+            "pb_input_file_str",
+            &IrType::Void,
+            &[IrType::I32, IrType::Ptr],
+            false,
+        );
+        self.module.declare_function(
+            "pb_input_file_int",
+            &IrType::Void,
+            &[IrType::I32, IrType::Ptr],
+            false,
+        );
+        self.module.declare_function(
+            "pb_input_file_dbl",
+            &IrType::Void,
+            &[IrType::I32, IrType::Ptr],
+            false,
+        );
+        self.module
+            .declare_function("pb_kill", &IrType::Void, &[IrType::Ptr], false);
 
         // C string library (size_t = i32 on 32-bit)
-        self.module.declare_function("strlen", &IrType::I32, &[IrType::Ptr], false);
-        self.module.declare_function("strcmp", &IrType::I32, &[IrType::Ptr, IrType::Ptr], false);
-        self.module.declare_function("strcpy", &IrType::Ptr, &[IrType::Ptr, IrType::Ptr], false);
-        self.module.declare_function("strncpy", &IrType::Ptr, &[IrType::Ptr, IrType::Ptr, IrType::I32], false);
-        self.module.declare_function("strcat", &IrType::Ptr, &[IrType::Ptr, IrType::Ptr], false);
-        self.module.declare_function("strstr", &IrType::Ptr, &[IrType::Ptr, IrType::Ptr], false);
-        self.module.declare_function("malloc", &IrType::Ptr, &[IrType::I32], false);
-        self.module.declare_function("free", &IrType::Void, &[IrType::Ptr], false);
-        self.module.declare_function("snprintf", &IrType::I32, &[IrType::Ptr, IrType::I32, IrType::Ptr], true);
-        self.module.declare_function("atof", &IrType::Double, &[IrType::Ptr], false);
-        self.module.declare_function("memcpy", &IrType::Ptr, &[IrType::Ptr, IrType::Ptr, IrType::I32], false);
-        self.module.declare_function("toupper", &IrType::I32, &[IrType::I32], false);
-        self.module.declare_function("tolower", &IrType::I32, &[IrType::I32], false);
+        self.module
+            .declare_function("strlen", &IrType::I32, &[IrType::Ptr], false);
+        self.module
+            .declare_function("strcmp", &IrType::I32, &[IrType::Ptr, IrType::Ptr], false);
+        self.module
+            .declare_function("strcpy", &IrType::Ptr, &[IrType::Ptr, IrType::Ptr], false);
+        self.module.declare_function(
+            "strncpy",
+            &IrType::Ptr,
+            &[IrType::Ptr, IrType::Ptr, IrType::I32],
+            false,
+        );
+        self.module
+            .declare_function("strcat", &IrType::Ptr, &[IrType::Ptr, IrType::Ptr], false);
+        self.module
+            .declare_function("strstr", &IrType::Ptr, &[IrType::Ptr, IrType::Ptr], false);
+        self.module
+            .declare_function("malloc", &IrType::Ptr, &[IrType::I32], false);
+        self.module
+            .declare_function("free", &IrType::Void, &[IrType::Ptr], false);
+        self.module.declare_function(
+            "snprintf",
+            &IrType::I32,
+            &[IrType::Ptr, IrType::I32, IrType::Ptr],
+            true,
+        );
+        self.module
+            .declare_function("atof", &IrType::Double, &[IrType::Ptr], false);
+        self.module.declare_function(
+            "memcpy",
+            &IrType::Ptr,
+            &[IrType::Ptr, IrType::Ptr, IrType::I32],
+            false,
+        );
+        self.module
+            .declare_function("toupper", &IrType::I32, &[IrType::I32], false);
+        self.module
+            .declare_function("tolower", &IrType::I32, &[IrType::I32], false);
 
         // System functions
-        self.module.declare_function("time", &IrType::I32, &[IrType::Ptr], false);
-        self.module.declare_function("pb_date", &IrType::Ptr, &[], false);
-        self.module.declare_function("pb_time", &IrType::Ptr, &[], false);
-        self.module.declare_function("pb_environ", &IrType::Ptr, &[IrType::Ptr], false);
-        self.module.declare_function("pb_exe_path", &IrType::Ptr, &[], false);
-        self.module.declare_function("pb_exe_name", &IrType::Ptr, &[], false);
-        self.module.declare_function("srand", &IrType::Void, &[IrType::I32], false);
-        self.module.declare_function("rand", &IrType::I32, &[], false);
-        self.module.declare_function("_mkdir", &IrType::I32, &[IrType::Ptr], false);
-        self.module.declare_function("_rmdir", &IrType::I32, &[IrType::Ptr], false);
-        self.module.declare_function("_chdir", &IrType::I32, &[IrType::Ptr], false);
-        self.module.declare_function("_access", &IrType::I32, &[IrType::Ptr, IrType::I32], false);
-        self.module.declare_dllimport("Sleep", &IrType::Void, &[IrType::I32]);
-        self.module.declare_dllimport("GetCommandLineA", &IrType::Ptr, &[]);
+        self.module
+            .declare_function("time", &IrType::I32, &[IrType::Ptr], false);
+        self.module
+            .declare_function("pb_date", &IrType::Ptr, &[], false);
+        self.module
+            .declare_function("pb_time", &IrType::Ptr, &[], false);
+        self.module
+            .declare_function("pb_environ", &IrType::Ptr, &[IrType::Ptr], false);
+        self.module
+            .declare_function("pb_exe_path", &IrType::Ptr, &[], false);
+        self.module
+            .declare_function("pb_exe_name", &IrType::Ptr, &[], false);
+        self.module
+            .declare_function("srand", &IrType::Void, &[IrType::I32], false);
+        self.module
+            .declare_function("rand", &IrType::I32, &[], false);
+        self.module
+            .declare_function("_mkdir", &IrType::I32, &[IrType::Ptr], false);
+        self.module
+            .declare_function("_rmdir", &IrType::I32, &[IrType::Ptr], false);
+        self.module
+            .declare_function("_chdir", &IrType::I32, &[IrType::Ptr], false);
+        self.module
+            .declare_function("_access", &IrType::I32, &[IrType::Ptr, IrType::I32], false);
+        self.module
+            .declare_dllimport("Sleep", &IrType::Void, &[IrType::I32]);
+        self.module
+            .declare_dllimport("GetCommandLineA", &IrType::Ptr, &[]);
 
         // Empty string constant
         let (empty_name, _) = self.module.add_string_constant("");
@@ -996,10 +1199,7 @@ impl Compiler {
                 }
                 TopLevel::GlobalDeclList(decls) => {
                     for vd in decls {
-                        if vd.is_array {
-                            self.pending_global_arrays
-                                .insert(normalize_name(&vd.name), vd.pb_type.clone());
-                        } else if future_arrays.contains(&normalize_name(&vd.name)) {
+                        if vd.is_array || future_arrays.contains(&normalize_name(&vd.name)) {
                             self.pending_global_arrays
                                 .insert(normalize_name(&vd.name), vd.pb_type.clone());
                         } else {
@@ -1061,8 +1261,10 @@ impl Compiler {
                         if let Some(fi) = self.functions.get(&name) {
                             let ir_name = fi.ir_name.clone();
                             let ret_type = fi.ret_type.clone();
-                            let param_types: Vec<IrType> = fi.params.iter().map(|p| p.ir_type.clone()).collect();
-                            self.module.declare_function(&ir_name, &ret_type, &param_types, false);
+                            let param_types: Vec<IrType> =
+                                fi.params.iter().map(|p| p.ir_type.clone()).collect();
+                            self.module
+                                .declare_function(&ir_name, &ret_type, &param_types, false);
                         }
                     }
                 }
@@ -1074,8 +1276,14 @@ impl Compiler {
                         let name = normalize_name(&sd.name);
                         if let Some(fi) = self.subs.get(&name) {
                             let ir_name = fi.ir_name.clone();
-                            let param_types: Vec<IrType> = fi.params.iter().map(|p| p.ir_type.clone()).collect();
-                            self.module.declare_function(&ir_name, &IrType::Void, &param_types, false);
+                            let param_types: Vec<IrType> =
+                                fi.params.iter().map(|p| p.ir_type.clone()).collect();
+                            self.module.declare_function(
+                                &ir_name,
+                                &IrType::Void,
+                                &param_types,
+                                false,
+                            );
                         }
                     }
                 }
@@ -1083,24 +1291,47 @@ impl Compiler {
             }
         }
         if codegen_errors > 0 {
-            eprintln!("[pbcompiler] {} codegen errors (functions skipped)", codegen_errors);
+            eprintln!(
+                "[pbcompiler] {} codegen errors (functions skipped)",
+                codegen_errors
+            );
         }
 
         // Emit main() entry point that calls PBMAIN() if it exists
         if let Some(pbmain) = self.functions.get("PBMAIN") {
             let pbmain_ir_name = pbmain.ir_name.clone();
             // Declare debug/crash facilities (from pb_runtime.c)
-            self.module.declare_function("pb_install_crash_handler", &IrType::Void, &[], false);
-            self.module.declare_function("pb_debug_enter", &IrType::Void, &[IrType::Ptr], false);
-            self.module.declare_function("pb_debug_log_msg", &IrType::Void, &[IrType::Ptr, IrType::Ptr], false);
-            self.module.declare_function("pb_debug_modal", &IrType::Void, &[IrType::Ptr, IrType::Ptr, IrType::Ptr], false);
-            self.module.declare_external_global("pb_debug_line", &IrType::I32);
-            let mut fb = self.module.create_function_builder("main", &IrType::I32, &[]);
+            self.module
+                .declare_function("pb_install_crash_handler", &IrType::Void, &[], false);
+            self.module
+                .declare_function("pb_debug_enter", &IrType::Void, &[IrType::Ptr], false);
+            self.module.declare_function(
+                "pb_debug_log_msg",
+                &IrType::Void,
+                &[IrType::Ptr, IrType::Ptr],
+                false,
+            );
+            self.module.declare_function(
+                "pb_debug_modal",
+                &IrType::Void,
+                &[IrType::Ptr, IrType::Ptr, IrType::Ptr],
+                false,
+            );
+            self.module
+                .declare_external_global("pb_debug_line", &IrType::I32);
+            let mut fb = self
+                .module
+                .create_function_builder("main", &IrType::I32, &[]);
             fb.call_void("pb_install_crash_handler", &[]);
             if self.debug_mode {
                 let (cat, _) = self.module.add_string_constant("BUILD");
-                let (msg, _) = self.module.add_string_constant("Debug mode enabled — modal and state logging active");
-                fb.call_void("pb_debug_log_msg", &[Val::new(cat, IrType::Ptr), Val::new(msg, IrType::Ptr)]);
+                let (msg, _) = self
+                    .module
+                    .add_string_constant("Debug mode enabled — modal and state logging active");
+                fb.call_void(
+                    "pb_debug_log_msg",
+                    &[Val::new(cat, IrType::Ptr), Val::new(msg, IrType::Ptr)],
+                );
             }
             let ret = fb.call(&IrType::I32, &pbmain_ir_name, &[]);
             fb.ret(&ret);
@@ -1259,11 +1490,14 @@ impl Compiler {
             let ret_type = Self::ir_type_for(&ds.return_type);
             if is_stubbed {
                 // Stubbed DLLs: declare as regular external (resolved by pb_runtime.obj)
-                self.module.declare_function(&ir_name, &ret_type, &ir_param_types, false);
+                self.module
+                    .declare_function(&ir_name, &ret_type, &ir_param_types, false);
             } else if is_stdcall {
-                self.module.declare_dllimport(&ir_name, &ret_type, &ir_param_types);
+                self.module
+                    .declare_dllimport(&ir_name, &ret_type, &ir_param_types);
             } else {
-                self.module.declare_dllimport_cdecl(&ir_name, &ret_type, &ir_param_types);
+                self.module
+                    .declare_dllimport_cdecl(&ir_name, &ret_type, &ir_param_types);
             }
             self.functions.insert(
                 name,
@@ -1278,11 +1512,14 @@ impl Compiler {
             );
         } else {
             if is_stubbed {
-                self.module.declare_function(&ir_name, &IrType::Void, &ir_param_types, false);
+                self.module
+                    .declare_function(&ir_name, &IrType::Void, &ir_param_types, false);
             } else if is_stdcall {
-                self.module.declare_dllimport(&ir_name, &IrType::Void, &ir_param_types);
+                self.module
+                    .declare_dllimport(&ir_name, &IrType::Void, &ir_param_types);
             } else {
-                self.module.declare_dllimport_cdecl(&ir_name, &IrType::Void, &ir_param_types);
+                self.module
+                    .declare_dllimport_cdecl(&ir_name, &IrType::Void, &ir_param_types);
             }
             self.subs.insert(
                 name,
@@ -1317,11 +1554,14 @@ impl Compiler {
         } else {
             if Self::is_string_pb(&vd.pb_type) {
                 // String globals init to empty string pointer
-                self.module.add_global(&name, &ir_type, &self.empty_string_name.clone());
+                self.module
+                    .add_global(&name, &ir_type, &self.empty_string_name.clone());
             } else {
-                self.module.add_global(&name, &ir_type, &ir_type.zero_literal());
+                self.module
+                    .add_global(&name, &ir_type, &ir_type.zero_literal());
             }
-            self.symbols.insert_global(name, ir_type, vd.pb_type.clone());
+            self.symbols
+                .insert_global(name, ir_type, vd.pb_type.clone());
         }
     }
 
@@ -1343,7 +1583,12 @@ impl Compiler {
             .map(|p| (p.name.clone(), p.ir_type.clone()))
             .collect();
 
-        let mut fb = self.module.create_function_builder_ex(&info.ir_name, &info.ret_type, &ir_params, info.export);
+        let mut fb = self.module.create_function_builder_ex(
+            &info.ir_name,
+            &info.ret_type,
+            &ir_params,
+            info.export,
+        );
 
         // Debug: record current function name
         let (fn_name_str, _) = self.module.add_string_constant(&name);
@@ -1369,9 +1614,15 @@ impl Compiler {
         // Allocate return value storage
         let retval_ptr = fb.alloca(&ret_ir);
         if ret_ir == IrType::Ptr {
-            fb.store(&Val::new(self.empty_string_name.clone(), IrType::Ptr), &retval_ptr);
+            fb.store(
+                &Val::new(self.empty_string_name.clone(), IrType::Ptr),
+                &retval_ptr,
+            );
         } else {
-            fb.store(&Val::new(ret_ir.zero_literal(), ret_ir.clone()), &retval_ptr);
+            fb.store(
+                &Val::new(ret_ir.zero_literal(), ret_ir.clone()),
+                &retval_ptr,
+            );
         }
         self.current_fn_retval_ptr = Some(retval_ptr);
 
@@ -1413,7 +1664,12 @@ impl Compiler {
             .map(|p| (p.name.clone(), p.ir_type.clone()))
             .collect();
 
-        let mut fb = self.module.create_function_builder_ex(&info.ir_name, &IrType::Void, &ir_params, info.export);
+        let mut fb = self.module.create_function_builder_ex(
+            &info.ir_name,
+            &IrType::Void,
+            &ir_params,
+            info.export,
+        );
 
         // Debug: record current function name
         let (fn_name_str, _) = self.module.add_string_constant(&name);
@@ -1462,7 +1718,12 @@ impl Compiler {
                 let ptr = fb.alloca(&Self::ir_type_for(&p.pb_type));
                 let param_val = Val::new(format!("%{}", p.name), p.ir_type.clone());
                 fb.store(&param_val, &ptr);
-                self.symbols.insert_local(p.name.clone(), ptr.name.clone(), Self::ir_type_for(&p.pb_type), p.pb_type.clone());
+                self.symbols.insert_local(
+                    p.name.clone(),
+                    ptr.name.clone(),
+                    Self::ir_type_for(&p.pb_type),
+                    p.pb_type.clone(),
+                );
             } else {
                 // BYREF: parameter IS a pointer
                 self.symbols.insert_local(
@@ -1493,8 +1754,12 @@ impl Compiler {
     ) {
         for stmt in stmts {
             match stmt {
-                Statement::Label(name) => { labels.insert(name.clone()); }
-                Statement::GoSub(name) => { gosub_targets.insert(name.clone()); }
+                Statement::Label(name) => {
+                    labels.insert(name.clone());
+                }
+                Statement::GoSub(name) => {
+                    gosub_targets.insert(name.clone());
+                }
                 Statement::GoTo(_) => {}
                 Statement::If(if_stmt) => {
                     Self::collect_labels_recursive(&if_stmt.then_body, labels, gosub_targets);
@@ -1530,7 +1795,8 @@ impl Compiler {
     fn setup_gosub_context(&mut self, fb: &mut FunctionBuilder, body: &[Statement]) {
         let (labels, gosub_targets) = Self::collect_labels(body);
         // Filter out labels that are actually known SUB/FUNCTION names (parser ambiguity)
-        let labels: HashSet<String> = labels.into_iter()
+        let labels: HashSet<String> = labels
+            .into_iter()
             .filter(|name| !self.functions.contains_key(&normalize_name(name)))
             .collect();
         if labels.is_empty() && gosub_targets.is_empty() {
@@ -1671,7 +1937,9 @@ impl Compiler {
             Statement::Return => self.compile_return(fb),
             Statement::GoTo(label) => self.compile_goto(fb, label),
             // Stubs: statements that compile to no-ops
-            Statement::OnErrorGoto(_) | Statement::OnErrorGotoZero | Statement::ResumeNext => Ok(()),
+            Statement::OnErrorGoto(_) | Statement::OnErrorGotoZero | Statement::ResumeNext => {
+                Ok(())
+            }
             Statement::Open(o) => self.compile_open(fb, o),
             Statement::Close(c) => self.compile_close(fb, c),
             Statement::PrintFile(p) => self.compile_print_file(fb, p),
@@ -1722,8 +1990,7 @@ impl Compiler {
                     self.symbols.insert_local(name, ptr.name, ir_type, pb_type);
                 }
             }
-            Expr::ArrayAccess(arr_name, indices)
-            | Expr::FunctionCall(arr_name, indices) => {
+            Expr::ArrayAccess(arr_name, indices) | Expr::FunctionCall(arr_name, indices) => {
                 let name = normalize_name(arr_name);
                 if let Some(arr_info) = self.symbols.lookup_array(&name).cloned() {
                     let mut compiled_indices = Vec::new();
@@ -1792,9 +2059,10 @@ impl Compiler {
                 let (base_ptr, base_pb) = self.compile_lvalue_ptr(fb, base_expr)?;
                 if let PbType::UserDefined(type_name) = &base_pb {
                     let type_name = normalize_name(type_name);
-                    let layout = self.type_layouts.get(&type_name).ok_or_else(|| {
-                        PbError::runtime(format!("Unknown TYPE: {}", type_name))
-                    })?;
+                    let layout = self
+                        .type_layouts
+                        .get(&type_name)
+                        .ok_or_else(|| PbError::runtime(format!("Unknown TYPE: {}", type_name)))?;
                     let member_norm = normalize_name(member);
                     let field_idx = *layout.field_map.get(&member_norm).ok_or_else(|| {
                         PbError::runtime(format!("Unknown field: {}.{}", type_name, member_norm))
@@ -1803,7 +2071,9 @@ impl Compiler {
                     let field_ptr = fb.gep_struct(&type_name, &base_ptr, field_idx);
                     Ok((field_ptr, field_pb))
                 } else {
-                    Err(PbError::runtime("TypeMember on non-TYPE variable".to_string()))
+                    Err(PbError::runtime(
+                        "TypeMember on non-TYPE variable".to_string(),
+                    ))
                 }
             }
             _ => Err(PbError::runtime("Not an lvalue".to_string())),
@@ -1839,10 +2109,7 @@ impl Compiler {
             }
             let array_ir = IrType::Array(total, Box::new(elem_ir.clone()));
             let ptr = fb.alloca(&array_ir);
-            fb.store(
-                &Val::new("zeroinitializer", array_ir.clone()),
-                &ptr,
-            );
+            fb.store(&Val::new("zeroinitializer", array_ir.clone()), &ptr);
             self.symbols.insert_local_array(
                 name,
                 ArrayInfo {
@@ -1888,8 +2155,10 @@ impl Compiler {
         fr: &FunctionReturnStmt,
     ) -> PbResult<()> {
         if let Some(retval_ptr) = self.current_fn_retval_ptr.clone() {
-            let (ref pb_type, ref ir_type) =
-                self.current_fn_return_type.clone().unwrap_or((PbType::Long, IrType::I32));
+            let (ref pb_type, ref ir_type) = self
+                .current_fn_return_type
+                .clone()
+                .unwrap_or((PbType::Long, IrType::I32));
             let value = self.compile_expr(fb, &fr.value)?;
             let converted = self.convert_value(fb, &value, ir_type, pb_type);
             let ptr = Val::new(retval_ptr.name, IrType::Ptr);
@@ -2330,7 +2599,10 @@ impl Compiler {
                 let case_desc = Self::describe_case_patterns(&case.patterns);
                 let (cat, _) = self.module.add_string_constant("SELECT");
                 let (msg, _) = self.module.add_string_constant(&case_desc);
-                fb.call_void("pb_debug_log_msg", &[Val::new(cat, IrType::Ptr), Val::new(msg, IrType::Ptr)]);
+                fb.call_void(
+                    "pb_debug_log_msg",
+                    &[Val::new(cat, IrType::Ptr), Val::new(msg, IrType::Ptr)],
+                );
             }
 
             self.compile_body(fb, &case.body)?;
@@ -2355,26 +2627,31 @@ impl Compiler {
     /// Build a human-readable description of CASE patterns for debug logging.
     /// e.g. "CASE 20" or "CASE 60, 70" or "CASE 1 TO 10" or "CASE IS > 5"
     fn describe_case_patterns(patterns: &[CasePattern]) -> String {
-        let parts: Vec<String> = patterns.iter().map(|p| match p {
-            CasePattern::Value(Expr::IntegerLit(n)) => format!("{}", n),
-            CasePattern::Value(Expr::FloatLit(f)) => format!("{}", f),
-            CasePattern::Value(Expr::StringLit(s)) => format!("\"{}\"", s),
-            CasePattern::Value(_) => "<expr>".to_string(),
-            CasePattern::Range(Expr::IntegerLit(lo), Expr::IntegerLit(hi)) => format!("{} TO {}", lo, hi),
-            CasePattern::Range(_, _) => "<expr> TO <expr>".to_string(),
-            CasePattern::Is(op, Expr::IntegerLit(n)) => {
-                let op_str = match op {
-                    CaseOp::Lt => "<",
-                    CaseOp::Lte => "<=",
-                    CaseOp::Gt => ">",
-                    CaseOp::Gte => ">=",
-                    CaseOp::Eq => "=",
-                    CaseOp::Neq => "<>",
-                };
-                format!("IS {} {}", op_str, n)
-            }
-            CasePattern::Is(_, _) => "IS <op> <expr>".to_string(),
-        }).collect();
+        let parts: Vec<String> = patterns
+            .iter()
+            .map(|p| match p {
+                CasePattern::Value(Expr::IntegerLit(n)) => format!("{}", n),
+                CasePattern::Value(Expr::FloatLit(f)) => format!("{}", f),
+                CasePattern::Value(Expr::StringLit(s)) => format!("\"{}\"", s),
+                CasePattern::Value(_) => "<expr>".to_string(),
+                CasePattern::Range(Expr::IntegerLit(lo), Expr::IntegerLit(hi)) => {
+                    format!("{} TO {}", lo, hi)
+                }
+                CasePattern::Range(_, _) => "<expr> TO <expr>".to_string(),
+                CasePattern::Is(op, Expr::IntegerLit(n)) => {
+                    let op_str = match op {
+                        CaseOp::Lt => "<",
+                        CaseOp::Lte => "<=",
+                        CaseOp::Gt => ">",
+                        CaseOp::Gte => ">=",
+                        CaseOp::Eq => "=",
+                        CaseOp::Neq => "<>",
+                    };
+                    format!("IS {} {}", op_str, n)
+                }
+                CasePattern::Is(_, _) => "IS <op> <expr>".to_string(),
+            })
+            .collect();
         format!("CASE {}", parts.join(", "))
     }
 
@@ -2474,7 +2751,7 @@ impl Compiler {
         let filenum_i32 = self.to_i32(fb, &filenum);
         for arg in &pf.args {
             let val = self.compile_expr(fb, arg)?;
-            let s = self.to_string(fb, &val);
+            let s = self.val_to_string(fb, &val);
             fb.call_void("pb_print_file", &[filenum_i32.clone(), s]);
         }
         // Print newline after args
@@ -2482,7 +2759,11 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_input_file(&mut self, fb: &mut FunctionBuilder, inp: &InputFileStmt) -> PbResult<()> {
+    fn compile_input_file(
+        &mut self,
+        fb: &mut FunctionBuilder,
+        inp: &InputFileStmt,
+    ) -> PbResult<()> {
         let filenum = self.compile_expr(fb, &inp.file_num)?;
         let filenum_i32 = self.to_i32(fb, &filenum);
         for var_expr in &inp.vars {
@@ -2503,7 +2784,11 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_line_input_file(&mut self, fb: &mut FunctionBuilder, li: &LineInputFileStmt) -> PbResult<()> {
+    fn compile_line_input_file(
+        &mut self,
+        fb: &mut FunctionBuilder,
+        li: &LineInputFileStmt,
+    ) -> PbResult<()> {
         let filenum = self.compile_expr(fb, &li.file_num)?;
         let filenum_i32 = self.to_i32(fb, &filenum);
         let result = fb.call(&IrType::Ptr, "pb_line_input", &[filenum_i32]);
@@ -2563,12 +2848,8 @@ impl Compiler {
                     } else {
                         fb.sub(&cur_i32, &amount)
                     };
-                    let converted = self.convert_value(
-                        fb,
-                        &result,
-                        &arr_info.elem_ir_type,
-                        &arr_info.pb_type,
-                    );
+                    let converted =
+                        self.convert_value(fb, &result, &arr_info.elem_ir_type, &arr_info.pb_type);
                     fb.store(&converted, &elem_ptr);
                 }
             }
@@ -2664,7 +2945,8 @@ impl Compiler {
         };
 
         // Build switch cases: return_id -> return-point label
-        let cases: Vec<(i32, String)> = ctx.return_points
+        let cases: Vec<(i32, String)> = ctx
+            .return_points
             .iter()
             .enumerate()
             .map(|(i, label)| ((i + 1) as i32, label.clone()))
@@ -2714,7 +2996,7 @@ impl Compiler {
                 // (stack buffer would be dangling after function return)
                 if matches!(info.pb_type, PbType::FixedString(_)) {
                     let buf_ptr = Val::new(ptr_name, IrType::Ptr);
-                    let len = fb.call(&IrType::I32, "strlen", &[buf_ptr.clone()]);
+                    let len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(&buf_ptr));
                     return Ok(fb.call(&IrType::Ptr, "pb_bstr_alloc", &[buf_ptr, len]));
                 }
                 let ptr = Val::new(ptr_name, IrType::Ptr);
@@ -2730,7 +3012,11 @@ impl Compiler {
                 }
             }
             Expr::PercentConst(name) => {
-                let val = self.pp_constants.get(&name.to_uppercase()).copied().unwrap_or(0);
+                let val = self
+                    .pp_constants
+                    .get(&name.to_uppercase())
+                    .copied()
+                    .unwrap_or(0);
                 Ok(fb.const_i32(val as i32))
             }
             Expr::FunctionCall(name, args) => {
@@ -3115,9 +3401,9 @@ impl Compiler {
 
     /// Wrap a malloc'd C string buffer into a BSTR and free the temp buffer.
     fn bstr_from_buf(&mut self, fb: &mut FunctionBuilder, buf: &Val) -> Val {
-        let len = fb.call(&IrType::I32, "strlen", &[buf.clone()]);
+        let len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(buf));
         let bstr = fb.call(&IrType::Ptr, "pb_bstr_alloc", &[buf.clone(), len]);
-        fb.call_void("free", &[buf.clone()]);
+        fb.call_void("free", std::slice::from_ref(buf));
         bstr
     }
 
@@ -3138,14 +3424,12 @@ impl Compiler {
         match &val.ty {
             IrType::Double => val.clone(),
             IrType::Float => fb.fpext(val, &IrType::Double),
-            IrType::I1 | IrType::I16 | IrType::I32 | IrType::I64 => {
-                fb.sitofp(val, &IrType::Double)
-            }
+            IrType::I1 | IrType::I16 | IrType::I32 | IrType::I64 => fb.sitofp(val, &IrType::Double),
             _ => val.clone(),
         }
     }
 
-    fn to_string(&mut self, fb: &mut FunctionBuilder, val: &Val) -> Val {
+    fn val_to_string(&mut self, fb: &mut FunctionBuilder, val: &Val) -> Val {
         if val.ty == IrType::Ptr {
             val.clone()
         } else {
@@ -3278,7 +3562,7 @@ impl Compiler {
                 } else {
                     fb.call(&IrType::Ptr, "GetCommandLineA", &[])
                 };
-                let len = fb.call(&IrType::I32, "strlen", &[cmd.clone()]);
+                let len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(&cmd));
                 Some(Ok(fb.call(&IrType::Ptr, "pb_bstr_alloc", &[cmd, len])))
             }
             "EXIST" => {
@@ -3313,17 +3597,27 @@ impl Compiler {
                                     PbType::String => 4, // pointer size (32-bit)
                                     PbType::UserDefined(tn) => {
                                         let tn = normalize_name(tn);
-                                        self.type_layouts.get(&tn)
-                                            .map(|l| l.fields.iter().map(|f| {
-                                                match &f.pb_type {
-                                                    PbType::Long | PbType::Dword | PbType::Single | PbType::String => 4,
-                                                    PbType::Integer | PbType::Word => 2,
-                                                    PbType::Byte => 1,
-                                                    PbType::Double | PbType::Ext | PbType::Cur | PbType::Quad => 8,
-                                                    PbType::FixedString(n) => *n as i32,
-                                                    _ => 4,
-                                                }
-                                            }).sum::<i32>())
+                                        self.type_layouts
+                                            .get(&tn)
+                                            .map(|l| {
+                                                l.fields
+                                                    .iter()
+                                                    .map(|f| match &f.pb_type {
+                                                        PbType::Long
+                                                        | PbType::Dword
+                                                        | PbType::Single
+                                                        | PbType::String => 4,
+                                                        PbType::Integer | PbType::Word => 2,
+                                                        PbType::Byte => 1,
+                                                        PbType::Double
+                                                        | PbType::Ext
+                                                        | PbType::Cur
+                                                        | PbType::Quad => 8,
+                                                        PbType::FixedString(n) => *n as i32,
+                                                        _ => 4,
+                                                    })
+                                                    .sum::<i32>()
+                                            })
                                             .unwrap_or(0)
                                     }
                                     _ => 4,
@@ -3341,9 +3635,7 @@ impl Compiler {
             }
             "ENVIRON" => {
                 let var_name = self.compile_expr(fb, &args[0]);
-                Some(var_name.map(|v| {
-                    fb.call(&IrType::Ptr, "pb_environ", &[v])
-                }))
+                Some(var_name.map(|v| fb.call(&IrType::Ptr, "pb_environ", &[v])))
             }
             "EXE" => {
                 // EXE.PATH$ and EXE.NAME$ — handled via the TypeMember path
@@ -3377,7 +3669,8 @@ impl Compiler {
                                     Err(e) => return Some(Err(e)),
                                 }
                             }
-                            let flat_idx = self.compute_flat_index(fb, &compiled_indices, &arr_info);
+                            let flat_idx =
+                                self.compute_flat_index(fb, &compiled_indices, &arr_info);
                             let base = Val::new(arr_info.ptr_name.clone(), IrType::Ptr);
                             let elem_ptr = fb.gep_array(&arr_info.array_ir_type, &base, &flat_idx);
                             Some(Ok(fb.ptrtoint(&elem_ptr)))
@@ -3647,7 +3940,7 @@ impl Compiler {
     fn builtin_str(&mut self, fb: &mut FunctionBuilder, args: &[Expr]) -> PbResult<Val> {
         let val = self.compile_expr(fb, &args[0])?;
         let buf_size = fb.const_i32(32);
-        let buf = fb.call(&IrType::Ptr, "malloc", &[buf_size.clone()]);
+        let buf = fb.call(&IrType::Ptr, "malloc", std::slice::from_ref(&buf_size));
         let f64_val = self.to_f64(fb, &val);
         let (fmt_name, _) = self.module.add_string_constant("%g");
         let fmt_ptr = Val::new(fmt_name, IrType::Ptr);
@@ -3657,7 +3950,7 @@ impl Compiler {
             &[buf.clone(), buf_size, fmt_ptr, f64_val],
             &[IrType::Ptr, IrType::I32, IrType::Ptr],
         );
-        let len = fb.call(&IrType::I32, "strlen", &[buf.clone()]);
+        let len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(&buf));
         let bstr = fb.call(&IrType::Ptr, "pb_bstr_alloc", &[buf.clone(), len]);
         fb.call_void("free", &[buf]);
         Ok(bstr)
@@ -3666,7 +3959,7 @@ impl Compiler {
     /// Convert a numeric value to a string (like STR$), for use in & concatenation
     fn num_to_string(&mut self, fb: &mut FunctionBuilder, val: &Val) -> Val {
         let buf_size = fb.const_i32(32);
-        let buf = fb.call(&IrType::Ptr, "malloc", &[buf_size.clone()]);
+        let buf = fb.call(&IrType::Ptr, "malloc", std::slice::from_ref(&buf_size));
         let f64_val = self.to_f64(fb, val);
         let (fmt_name, _) = self.module.add_string_constant("%g");
         let fmt_ptr = Val::new(fmt_name, IrType::Ptr);
@@ -3676,7 +3969,7 @@ impl Compiler {
             &[buf.clone(), buf_size, fmt_ptr, f64_val],
             &[IrType::Ptr, IrType::I32, IrType::Ptr],
         );
-        let len = fb.call(&IrType::I32, "strlen", &[buf.clone()]);
+        let len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(&buf));
         let bstr = fb.call(&IrType::Ptr, "pb_bstr_alloc", &[buf.clone(), len]);
         fb.call_void("free", &[buf]);
         bstr
@@ -3699,7 +3992,7 @@ impl Compiler {
         let s = self.compile_expr(fb, &args[0])?;
         let n = self.compile_expr(fb, &args[1])?;
         let n_i32 = self.to_i32(fb, &n);
-        let len = fb.call(&IrType::I32, "strlen", &[s.clone()]);
+        let len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(&s));
         let offset = fb.sub(&len, &n_i32);
         let src = fb.gep_byte(&s, &offset);
         Ok(fb.call(&IrType::Ptr, "pb_bstr_alloc", &[src, n_i32]))
@@ -3723,7 +4016,7 @@ impl Compiler {
             Ok(fb.call(&IrType::Ptr, "pb_bstr_alloc", &[src, len_i32]))
         } else {
             // MID$(s, start) — rest of string
-            let src_len = fb.call(&IrType::I32, "strlen", &[src.clone()]);
+            let src_len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(&src));
             Ok(fb.call(&IrType::Ptr, "pb_bstr_alloc", &[src, src_len]))
         }
     }
@@ -3774,7 +4067,7 @@ impl Compiler {
 
     fn builtin_ucase(&mut self, fb: &mut FunctionBuilder, args: &[Expr]) -> PbResult<Val> {
         let s = self.compile_expr(fb, &args[0])?;
-        let len = fb.call(&IrType::I32, "strlen", &[s.clone()]);
+        let len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(&s));
         let one = fb.const_i32(1);
         let buf_size = fb.add(&len, &one);
         let buf = fb.call(&IrType::Ptr, "malloc", &[buf_size]);
@@ -3817,7 +4110,7 @@ impl Compiler {
 
     fn builtin_lcase(&mut self, fb: &mut FunctionBuilder, args: &[Expr]) -> PbResult<Val> {
         let s = self.compile_expr(fb, &args[0])?;
-        let len = fb.call(&IrType::I32, "strlen", &[s.clone()]);
+        let len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(&s));
         let one = fb.const_i32(1);
         let buf_size = fb.add(&len, &one);
         let buf = fb.call(&IrType::Ptr, "malloc", &[buf_size]);
@@ -3888,7 +4181,7 @@ impl Compiler {
         fb.label(&exit_label);
         let i_final = fb.load(&IrType::I32, &i_ptr);
         let start = fb.gep_byte(&s, &i_final);
-        let rest_len = fb.call(&IrType::I32, "strlen", &[start.clone()]);
+        let rest_len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(&start));
         let one = fb.const_i32(1);
         let buf_size = fb.add(&rest_len, &one);
         let buf = fb.call(&IrType::Ptr, "malloc", &[buf_size]);
@@ -3899,7 +4192,7 @@ impl Compiler {
     fn builtin_rtrim(&mut self, fb: &mut FunctionBuilder, args: &[Expr]) -> PbResult<Val> {
         // Copy string, then walk backwards removing trailing spaces
         let s = self.compile_expr(fb, &args[0])?;
-        let len = fb.call(&IrType::I32, "strlen", &[s.clone()]);
+        let len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(&s));
         let one = fb.const_i32(1);
         let buf_size = fb.add(&len, &one);
         let buf = fb.call(&IrType::Ptr, "malloc", &[buf_size]);
@@ -3947,7 +4240,7 @@ impl Compiler {
         let s = self.compile_expr(fb, &args[0])?;
 
         // RTRIM part: copy and truncate trailing spaces
-        let len = fb.call(&IrType::I32, "strlen", &[s.clone()]);
+        let len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(&s));
         let one = fb.const_i32(1);
         let buf_size = fb.add(&len, &one);
         let buf = fb.call(&IrType::Ptr, "malloc", &[buf_size]);
@@ -4011,7 +4304,7 @@ impl Compiler {
         fb.label(&exit2);
         let j_final = fb.load(&IrType::I32, &j_ptr);
         let start = fb.gep_byte(&buf, &j_final);
-        let rest_len = fb.call(&IrType::I32, "strlen", &[start.clone()]);
+        let rest_len = fb.call(&IrType::I32, "strlen", std::slice::from_ref(&start));
         let result_size = fb.add(&rest_len, &one);
         let result = fb.call(&IrType::Ptr, "malloc", &[result_size]);
         fb.call(&IrType::Ptr, "strcpy", &[result.clone(), start]);
@@ -4177,6 +4470,7 @@ impl Compiler {
     }
 
     /// Convert any value to i64 (for GEP indices).
+    #[allow(dead_code)]
     fn to_i64(&self, fb: &mut FunctionBuilder, val: &Val) -> Val {
         match &val.ty {
             IrType::I64 => val.clone(),
@@ -4293,7 +4587,8 @@ impl Compiler {
                         let pb_type = self.pending_global_arrays.get(&name).unwrap().clone();
                         // Compute array layout and push to session_fields
                         self.declare_global_array(&name, &pb_type, &dim.bounds);
-                    } else if dim.scope == DimScope::Global && dim.bounds.is_empty()
+                    } else if dim.scope == DimScope::Global
+                        && dim.bounds.is_empty()
                         && self.symbols.lookup(&name).is_none()
                     {
                         // GLOBAL scalar declared inside a SUB body (e.g., GLOBAL ForceSync AS LONG in SetupDims)
@@ -4337,7 +4632,9 @@ impl Compiler {
         let struct_name = "PBSESSIONDATA";
 
         // Collect field types
-        let field_types: Vec<IrType> = self.session_fields.iter()
+        let field_types: Vec<IrType> = self
+            .session_fields
+            .iter()
             .map(|f| f.ir_type.clone())
             .collect();
 
@@ -4345,9 +4642,11 @@ impl Compiler {
         self.module.define_struct_type(struct_name, &field_types);
 
         // Emit the global instance with dllexport
-        self.module.add_global_exported("pb.session",
+        self.module.add_global_exported(
+            "pb.session",
             &IrType::Struct(struct_name.to_string()),
-            "zeroinitializer");
+            "zeroinitializer",
+        );
 
         // Register each field in the symbol table
         for (idx, field) in self.session_fields.iter().enumerate() {
@@ -4381,14 +4680,18 @@ impl Compiler {
             }
         }
 
-        eprintln!("[pbcompiler] Session struct: {} fields in %{}", self.session_fields.len(), struct_name);
+        eprintln!(
+            "[pbcompiler] Session struct: {} fields in %{}",
+            self.session_fields.len(),
+            struct_name
+        );
     }
 
     /// Emit the GetSession() export function returning a pointer to the session struct.
     fn emit_get_session(&mut self) {
-        let mut fb = self.module.create_function_builder_ex(
-            "GetSession", &IrType::Ptr, &[], true,
-        );
+        let mut fb = self
+            .module
+            .create_function_builder_ex("GetSession", &IrType::Ptr, &[], true);
         fb.ret(&Val::new("@pb.session", IrType::Ptr));
         self.module.add_function_body(fb.finish());
     }
@@ -4410,7 +4713,12 @@ impl Compiler {
         }
     }
 
-    fn ensure_variable_ptr(&mut self, fb: &mut FunctionBuilder, name: &str, original_name: &str) -> String {
+    fn ensure_variable_ptr(
+        &mut self,
+        fb: &mut FunctionBuilder,
+        name: &str,
+        original_name: &str,
+    ) -> String {
         if let Some(info) = self.symbols.lookup(name) {
             return info.ptr_name.clone();
         }

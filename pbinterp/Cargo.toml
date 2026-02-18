@@ -3,7 +3,7 @@ name = "pbinterp"
 version = "0.1.0"
 edition = "2021"
 description = "PowerBASIC 9.80 interpreter and test runner"
-license = "MIT"
+license = "Apache-2.0"
 repository = "https://github.com/benstopics/powerbasilisk"
 
 [dependencies]

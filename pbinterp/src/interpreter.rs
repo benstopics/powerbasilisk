@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::io::Write;
 
+use crate::builtins;
+use crate::environment::{normalize, ArrayDesc, CallFrame, Environment};
+use crate::value::Value;
 use pb::ast::*;
 use pb::error::{PbError, PbResult};
-use crate::builtins;
-use crate::environment::{ArrayDesc, CallFrame, Environment, normalize};
-use crate::value::Value;
 
 /// Control flow signals
 #[allow(dead_code)]
@@ -38,6 +38,12 @@ pub struct Interpreter {
     static_vars: HashMap<(String, String), Value>,
     /// Static array storage: (sub_name, array_name) -> ArrayDesc
     static_arrays: HashMap<(String, String), ArrayDesc>,
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Interpreter {
@@ -128,8 +134,20 @@ impl Interpreter {
                     BinaryOp::Add => av + bv,
                     BinaryOp::Sub => av - bv,
                     BinaryOp::Mul => av * bv,
-                    BinaryOp::Div => if bv != 0 { av / bv } else { 0 },
-                    BinaryOp::Mod => if bv != 0 { av % bv } else { 0 },
+                    BinaryOp::Div => {
+                        if bv != 0 {
+                            av / bv
+                        } else {
+                            0
+                        }
+                    }
+                    BinaryOp::Mod => {
+                        if bv != 0 {
+                            av % bv
+                        } else {
+                            0
+                        }
+                    }
                     BinaryOp::And => av & bv,
                     BinaryOp::Or => av | bv,
                     _ => 0,
@@ -154,7 +172,8 @@ impl Interpreter {
             // Scalar declaration in DIM context
             match dim.scope {
                 DimScope::Local => {
-                    self.env.declare_local(&dim.name, Value::default_for_type(&dim.pb_type));
+                    self.env
+                        .declare_local(&dim.name, Value::default_for_type(&dim.pb_type));
                 }
                 DimScope::Global | DimScope::Dim => {
                     self.env.declare_global(&dim.name, &dim.pb_type);
@@ -163,7 +182,8 @@ impl Interpreter {
                     // Static: persists across calls to the same function
                     let func_name = self.env.current_function_name();
                     let key = (func_name, normalize(&dim.name));
-                    let val = self.static_vars
+                    let val = self
+                        .static_vars
                         .get(&key)
                         .cloned()
                         .unwrap_or_else(|| Value::default_for_type(&dim.pb_type));
@@ -195,7 +215,8 @@ impl Interpreter {
             } else if dim.is_redim {
                 self.env.redim_array(&dim.name, bounds, &dim.pb_type);
             } else {
-                self.env.dim_array(&dim.name, bounds, &dim.pb_type, is_local);
+                self.env
+                    .dim_array(&dim.name, bounds, &dim.pb_type, is_local);
             }
         }
 
@@ -214,8 +235,6 @@ impl Interpreter {
                 } else {
                     arg_val
                 }
-            } else if param.is_optional {
-                Value::default_for_type(&param.pb_type)
             } else {
                 Value::default_for_type(&param.pb_type)
             };
@@ -244,8 +263,6 @@ impl Interpreter {
                 } else {
                     arg_val
                 }
-            } else if param.is_optional {
-                Value::default_for_type(&param.pb_type)
             } else {
                 Value::default_for_type(&param.pb_type)
             };
@@ -315,7 +332,9 @@ impl Interpreter {
 
             match result {
                 Ok(flow) => match flow {
-                    Flow::Normal => { i += 1; }
+                    Flow::Normal => {
+                        i += 1;
+                    }
                     Flow::GoTo(label) => {
                         let key = label.to_uppercase();
                         if let Some(&target) = labels.get(&key) {
@@ -488,16 +507,17 @@ impl Interpreter {
             .collect::<PbResult<Vec<_>>>()?;
 
         // Check for built-in subs
-        match name.as_str() {
-            "PRINT" => {
-                // PRINT as a statement — shouldn't come here normally
-                let output: String = args.iter().map(|a| a.to_string_val()).collect::<Vec<_>>().join("");
-                writeln!(self.stdout, "{}", output).ok();
-                print!("{}", output);
-                println!();
-                return Ok(Flow::Normal);
-            }
-            _ => {}
+        if name.as_str() == "PRINT" {
+            // PRINT as a statement — shouldn't come here normally
+            let output: String = args
+                .iter()
+                .map(|a| a.to_string_val())
+                .collect::<Vec<_>>()
+                .join("");
+            writeln!(self.stdout, "{}", output).ok();
+            print!("{}", output);
+            println!();
+            return Ok(Flow::Normal);
         }
 
         // Look up user-defined SUB
@@ -713,7 +733,7 @@ impl Interpreter {
 
     fn exec_print(&mut self, print_stmt: &PrintStmt) -> PbResult<()> {
         let mut output = String::new();
-        for (_i, arg) in print_stmt.args.iter().enumerate() {
+        for arg in print_stmt.args.iter() {
             let val = self.eval_expr(arg)?;
             output.push_str(&val.to_string_val());
         }

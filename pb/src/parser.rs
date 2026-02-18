@@ -53,7 +53,11 @@ impl Parser {
     }
 
     fn advance(&mut self) -> &Token {
-        let tok = self.tokens.get(self.pos).map(|t| &t.token).unwrap_or(&Token::Eof);
+        let tok = self
+            .tokens
+            .get(self.pos)
+            .map(|t| &t.token)
+            .unwrap_or(&Token::Eof);
         if self.pos < self.tokens.len() {
             self.pos += 1;
         }
@@ -88,7 +92,10 @@ impl Parser {
     }
 
     fn consume_to_eol(&mut self) {
-        while !matches!(self.peek(), Token::Eol | Token::Eof | Token::Colon | Token::Else | Token::ElseIf) {
+        while !matches!(
+            self.peek(),
+            Token::Eol | Token::Eof | Token::Colon | Token::Else | Token::ElseIf
+        ) {
             self.advance();
         }
         // Consume Eol but NOT Colon/Else/ElseIf — these are statement-level
@@ -184,14 +191,15 @@ impl Parser {
                 let fd = self.parse_function_decl()?;
                 Ok(Some(TopLevel::FunctionDecl(fd)))
             }
-            Token::Declare => {
-                match self.parse_declare_stmt(line)? {
-                    Some(ds) => Ok(Some(TopLevel::DeclareStmt(ds))),
-                    None => Ok(None),
-                }
-            }
-            Token::HashInclude | Token::HashCompile | Token::HashDim
-            | Token::HashRegister | Token::HashDebug => {
+            Token::Declare => match self.parse_declare_stmt(line)? {
+                Some(ds) => Ok(Some(TopLevel::DeclareStmt(ds))),
+                None => Ok(None),
+            },
+            Token::HashInclude
+            | Token::HashCompile
+            | Token::HashDim
+            | Token::HashRegister
+            | Token::HashDebug => {
                 self.consume_to_eol();
                 Ok(None)
             }
@@ -200,8 +208,13 @@ impl Parser {
                 self.advance();
                 loop {
                     match self.peek() {
-                        Token::EndMacro | Token::Eof => { self.advance(); break; }
-                        _ => { self.advance(); }
+                        Token::EndMacro | Token::Eof => {
+                            self.advance();
+                            break;
+                        }
+                        _ => {
+                            self.advance();
+                        }
                     }
                 }
                 self.consume_to_eol();
@@ -270,7 +283,9 @@ impl Parser {
         self.consume_to_eol();
 
         if decls.len() == 1 {
-            return Ok(Some(TopLevel::GlobalDecl(decls.into_iter().next().unwrap())));
+            return Ok(Some(TopLevel::GlobalDecl(
+                decls.into_iter().next().unwrap(),
+            )));
         }
         // Multiple globals on one line: emit as GlobalDeclList
         Ok(Some(TopLevel::GlobalDeclList(decls)))
@@ -571,11 +586,7 @@ impl Parser {
             self.skip_eol();
         }
 
-        Ok(TypeDecl {
-            name,
-            fields,
-            line,
-        })
+        Ok(TypeDecl { name, fields, line })
     }
 
     fn parse_sub_decl(&mut self) -> PbResult<SubDecl> {
@@ -872,11 +883,15 @@ impl Parser {
     // ===== Body parsing (inside SUB/FUNCTION) =====
 
     fn parse_body(&mut self, terminators: &[BodyEnd]) -> PbResult<Vec<Statement>> {
-        self.parse_body_with_terminator(terminators).map(|(stmts, _)| stmts)
+        self.parse_body_with_terminator(terminators)
+            .map(|(stmts, _)| stmts)
     }
 
     /// Like parse_body but also returns which terminator was matched (if any).
-    fn parse_body_with_terminator(&mut self, terminators: &[BodyEnd]) -> PbResult<(Vec<Statement>, Option<BodyEnd>)> {
+    fn parse_body_with_terminator(
+        &mut self,
+        terminators: &[BodyEnd],
+    ) -> PbResult<(Vec<Statement>, Option<BodyEnd>)> {
         let mut stmts = Vec::new();
         self.skip_eol();
 
@@ -910,7 +925,10 @@ impl Parser {
             if self.peek() == &Token::End {
                 match self.peek_at(1) {
                     Some(&Token::Sub) | Some(&Token::Function) => {
-                        if !terminators.iter().any(|t| matches!(t, BodyEnd::EndSub | BodyEnd::EndFunction)) {
+                        if !terminators
+                            .iter()
+                            .any(|t| matches!(t, BodyEnd::EndSub | BodyEnd::EndFunction))
+                        {
                             break; // don't consume, let parent handle it
                         }
                     }
@@ -954,7 +972,7 @@ impl Parser {
             Token::Function => {
                 // FUNCTION followed by identifier (not =) = new function declaration
                 match self.peek_at(1) {
-                    Some(Token::Eq) => false,  // FUNCTION = expr (return value)
+                    Some(Token::Eq) => false,           // FUNCTION = expr (return value)
                     Some(Token::Identifier(_)) => true, // New function declaration
                     _ => false,
                 }
@@ -963,10 +981,7 @@ impl Parser {
             Token::Type => {
                 // TYPE at start of line (new type decl, not inside body)
                 // Check if next is an identifier (type name), not a keyword
-                match self.peek_at(1) {
-                    Some(Token::Identifier(_)) => true,
-                    _ => false,
-                }
+                matches!(self.peek_at(1), Some(Token::Identifier(_)))
             }
             _ => false,
         }
@@ -983,15 +998,11 @@ impl Parser {
 
     fn matches_terminator(&self, term: &BodyEnd) -> bool {
         match term {
-            BodyEnd::EndSub => {
-                self.peek() == &Token::End && self.peek_at(1) == Some(&Token::Sub)
-            }
+            BodyEnd::EndSub => self.peek() == &Token::End && self.peek_at(1) == Some(&Token::Sub),
             BodyEnd::EndFunction => {
                 self.peek() == &Token::End && self.peek_at(1) == Some(&Token::Function)
             }
-            BodyEnd::EndIf => {
-                self.peek() == &Token::End && self.peek_at(1) == Some(&Token::If)
-            }
+            BodyEnd::EndIf => self.peek() == &Token::End && self.peek_at(1) == Some(&Token::If),
             BodyEnd::Else => self.peek() == &Token::Else,
             BodyEnd::ElseIf => self.peek() == &Token::ElseIf,
             BodyEnd::Next => self.peek() == &Token::Next,
@@ -1002,8 +1013,7 @@ impl Parser {
             }
             BodyEnd::Case => self.peek() == &Token::Case,
             BodyEnd::CaseElse => {
-                self.peek() == &Token::Case
-                    && self.peek_at(1) == Some(&Token::Else)
+                self.peek() == &Token::Case && self.peek_at(1) == Some(&Token::Else)
             }
         }
     }
@@ -1018,8 +1028,13 @@ impl Parser {
                         self.consume_to_eol();
                     }
                     BodyEnd::EndSelect
-                    | BodyEnd::Else | BodyEnd::ElseIf | BodyEnd::Next
-                    | BodyEnd::Loop | BodyEnd::Wend | BodyEnd::Case | BodyEnd::CaseElse => {
+                    | BodyEnd::Else
+                    | BodyEnd::ElseIf
+                    | BodyEnd::Next
+                    | BodyEnd::Loop
+                    | BodyEnd::Wend
+                    | BodyEnd::Case
+                    | BodyEnd::CaseElse => {
                         // Don't consume — caller needs to see it
                     }
                 }
@@ -1045,7 +1060,7 @@ impl Parser {
             Token::Print => self.parse_print_statement(),
             Token::Input => {
                 self.advance(); // consume INPUT
-                // INPUT #filenum, var1, var2, ...
+                                // INPUT #filenum, var1, var2, ...
                 if self.peek() == &Token::Hash {
                     self.advance(); // consume #
                     let file_num = self.parse_expression()?;
@@ -1057,11 +1072,15 @@ impl Parser {
                         vars.push(self.parse_expression()?);
                     }
                     self.consume_to_eol();
-                    return Ok(Statement::InputFile(InputFileStmt { file_num, vars, line }));
+                    return Ok(Statement::InputFile(InputFileStmt {
+                        file_num,
+                        vars,
+                        line,
+                    }));
                 }
                 // Plain INPUT (console) — not implemented, consume
                 self.consume_to_eol();
-                return Ok(Statement::Noop);
+                Ok(Statement::Noop)
             }
             Token::Open => self.parse_open_statement(),
             Token::Close => self.parse_close_statement(),
@@ -1145,14 +1164,19 @@ impl Parser {
                 self.expect(&Token::Eq)?;
                 let value = self.parse_expression()?;
                 self.consume_to_eol();
-                Ok(Statement::FunctionReturn(FunctionReturnStmt { value, line }))
+                Ok(Statement::FunctionReturn(FunctionReturnStmt {
+                    value,
+                    line,
+                }))
             }
             Token::Local => {
                 let dims = self.parse_local_decl()?;
                 if dims.len() == 1 {
                     Ok(Statement::Dim(dims.into_iter().next().unwrap()))
                 } else {
-                    Ok(Statement::Block(dims.into_iter().map(Statement::Dim).collect()))
+                    Ok(Statement::Block(
+                        dims.into_iter().map(Statement::Dim).collect(),
+                    ))
                 }
             }
             Token::Dim => {
@@ -1185,9 +1209,18 @@ impl Parser {
                             return Ok(Statement::OnErrorGotoZero);
                         }
                         let label = match self.peek().clone() {
-                            Token::Identifier(s) => { self.advance(); s }
-                            Token::IntegerLiteral(n) => { self.advance(); n.to_string() }
-                            _ => { self.consume_to_eol(); return Ok(Statement::Noop); }
+                            Token::Identifier(s) => {
+                                self.advance();
+                                s
+                            }
+                            Token::IntegerLiteral(n) => {
+                                self.advance();
+                                n.to_string()
+                            }
+                            _ => {
+                                self.consume_to_eol();
+                                return Ok(Statement::Noop);
+                            }
                         };
                         self.consume_to_eol();
                         return Ok(Statement::OnErrorGoto(label));
@@ -1217,12 +1250,21 @@ impl Parser {
             Token::GoSub => {
                 self.advance();
                 let label = match self.peek().clone() {
-                    Token::Identifier(s) => { self.advance(); s }
-                    Token::IntegerLiteral(n) => { self.advance(); n.to_string() }
-                    _ => return Err(PbError::parser(
-                        format!("Expected label after GOSUB, got {:?}", self.peek()),
-                        self.current_file(), line,
-                    )),
+                    Token::Identifier(s) => {
+                        self.advance();
+                        s
+                    }
+                    Token::IntegerLiteral(n) => {
+                        self.advance();
+                        n.to_string()
+                    }
+                    _ => {
+                        return Err(PbError::parser(
+                            format!("Expected label after GOSUB, got {:?}", self.peek()),
+                            self.current_file(),
+                            line,
+                        ))
+                    }
                 };
                 self.consume_to_eol();
                 Ok(Statement::GoSub(label))
@@ -1230,12 +1272,21 @@ impl Parser {
             Token::GoTo => {
                 self.advance();
                 let label = match self.peek().clone() {
-                    Token::Identifier(s) => { self.advance(); s }
-                    Token::IntegerLiteral(n) => { self.advance(); n.to_string() }
-                    _ => return Err(PbError::parser(
-                        format!("Expected label after GOTO, got {:?}", self.peek()),
-                        self.current_file(), line,
-                    )),
+                    Token::Identifier(s) => {
+                        self.advance();
+                        s
+                    }
+                    Token::IntegerLiteral(n) => {
+                        self.advance();
+                        n.to_string()
+                    }
+                    _ => {
+                        return Err(PbError::parser(
+                            format!("Expected label after GOTO, got {:?}", self.peek()),
+                            self.current_file(),
+                            line,
+                        ))
+                    }
                 };
                 self.consume_to_eol();
                 Ok(Statement::GoTo(label))
@@ -1279,22 +1330,22 @@ impl Parser {
                     Some(Token::Sub) | Some(Token::Function) => {
                         // END SUB/FUNCTION should be handled as body terminators,
                         // not consumed here. Return error to let body parser deal with it.
-                        return Err(PbError::parser(
+                        Err(PbError::parser(
                             "Unexpected END SUB/FUNCTION inside body",
                             None,
                             self.current_line(),
-                        ));
+                        ))
                     }
                     Some(Token::If) | Some(Token::Select) | Some(Token::Type) => {
                         // Mismatched block-end — consume and skip
                         self.consume_to_eol();
-                        return Ok(Statement::Noop);
+                        Ok(Statement::Noop)
                     }
                     _ => {
                         // Standalone END (program termination)
                         self.advance(); // consume END
                         self.consume_to_eol();
-                        return Ok(Statement::Noop);
+                        Ok(Statement::Noop)
                     }
                 }
             }
@@ -1302,7 +1353,7 @@ impl Parser {
                 // Numeric label: 30300 followed by anything (used with GOSUB/GOTO)
                 let label = n.to_string();
                 self.advance(); // consume the number
-                return Ok(Statement::Label(label));
+                Ok(Statement::Label(label))
             }
             Token::Identifier(ref name) => {
                 let name_upper = name.to_uppercase();
@@ -1319,7 +1370,11 @@ impl Parser {
                             self.expect(&Token::Comma)?;
                             let var = self.parse_expression()?;
                             self.consume_to_eol();
-                            return Ok(Statement::LineInputFile(LineInputFileStmt { file_num, var, line }));
+                            return Ok(Statement::LineInputFile(LineInputFileStmt {
+                                file_num,
+                                var,
+                                line,
+                            }));
                         }
                         // LINE INPUT without # — console, not implemented
                         self.consume_to_eol();
@@ -1398,7 +1453,10 @@ impl Parser {
                 // DDT statements: DIALOG, CONTROL, MENU, TOOLBAR, STATUSBAR
                 // COMBOBOX, LISTBOX, TREEVIEW, LISTVIEW, XPRINT — DDT UI verbs
                 // SLEEP, RANDOMIZE, MKDIR — parse arg, emit as function call
-                if matches!(name_upper.as_str(), "SLEEP" | "RANDOMIZE" | "MKDIR" | "RMDIR" | "CHDIR") {
+                if matches!(
+                    name_upper.as_str(),
+                    "SLEEP" | "RANDOMIZE" | "MKDIR" | "RMDIR" | "CHDIR"
+                ) {
                     let call_name = name_upper.clone();
                     self.advance();
                     let args = if !self.at_eol_or_eof() {
@@ -1407,15 +1465,35 @@ impl Parser {
                         Vec::new()
                     };
                     self.consume_to_eol();
-                    return Ok(Statement::Call(CallStmt { name: call_name, args, line }));
+                    return Ok(Statement::Call(CallStmt {
+                        name: call_name,
+                        args,
+                        line,
+                    }));
                 }
 
-                if matches!(name_upper.as_str(),
-                    "DIALOG" | "CONTROL" | "MENU" | "TOOLBAR" | "STATUSBAR"
-                    | "COMBOBOX" | "LISTBOX" | "TREEVIEW" | "LISTVIEW" | "XPRINT"
-                    | "WRITE" | "LSET" | "RSET" | "RESET"
-                    | "ERASE" | "FLUSH" | "NAME"
-                    | "SEEK" | "LOCK" | "UNLOCK"
+                if matches!(
+                    name_upper.as_str(),
+                    "DIALOG"
+                        | "CONTROL"
+                        | "MENU"
+                        | "TOOLBAR"
+                        | "STATUSBAR"
+                        | "COMBOBOX"
+                        | "LISTBOX"
+                        | "TREEVIEW"
+                        | "LISTVIEW"
+                        | "XPRINT"
+                        | "WRITE"
+                        | "LSET"
+                        | "RSET"
+                        | "RESET"
+                        | "ERASE"
+                        | "FLUSH"
+                        | "NAME"
+                        | "SEEK"
+                        | "LOCK"
+                        | "UNLOCK"
                 ) {
                     self.advance();
                     self.consume_to_eol();
@@ -1503,9 +1581,7 @@ impl Parser {
                 // Or a label target in single-line IF: IF cond THEN LabelName ELSE ...
                 self.advance(); // consume identifier
                 let mut args = Vec::new();
-                if !self.at_eol_or_eof()
-                    && !matches!(self.peek(), Token::Else | Token::ElseIf)
-                {
+                if !self.at_eol_or_eof() && !matches!(self.peek(), Token::Else | Token::ElseIf) {
                     args.push(self.parse_expression()?);
                     while self.peek() == &Token::Comma {
                         self.advance();
@@ -1513,11 +1589,11 @@ impl Parser {
                     }
                 }
                 self.consume_to_eol();
-                return Ok(Statement::Call(CallStmt {
+                Ok(Statement::Call(CallStmt {
                     name: name_clone,
                     args,
                     line,
-                }));
+                }))
             }
             _ => {
                 self.consume_to_eol();
@@ -1588,7 +1664,7 @@ impl Parser {
                 // Continue with more colon-separated statements on the same line
                 if self.peek() == &Token::Colon && self.current_line() == if_line {
                     self.advance(); // consume :
-                    // But check if next token is ELSE (IF cond THEN stmt : ELSE stmt)
+                                    // But check if next token is ELSE (IF cond THEN stmt : ELSE stmt)
                     if self.peek() == &Token::Else {
                         break;
                     }
@@ -1628,7 +1704,8 @@ impl Parser {
         self.skip_eol();
 
         // Multi-line IF
-        let (then_body, matched) = self.parse_body_with_terminator(&[BodyEnd::EndIf, BodyEnd::Else, BodyEnd::ElseIf])?;
+        let (then_body, matched) =
+            self.parse_body_with_terminator(&[BodyEnd::EndIf, BodyEnd::Else, BodyEnd::ElseIf])?;
 
         let mut elseif_clauses = Vec::new();
         let mut else_body = Vec::new();
@@ -1643,7 +1720,11 @@ impl Parser {
                 let elif_cond = self.parse_expression()?;
                 self.expect(&Token::Then)?;
                 self.consume_to_eol();
-                let (elif_body, elif_matched) = self.parse_body_with_terminator(&[BodyEnd::EndIf, BodyEnd::Else, BodyEnd::ElseIf])?;
+                let (elif_body, elif_matched) = self.parse_body_with_terminator(&[
+                    BodyEnd::EndIf,
+                    BodyEnd::Else,
+                    BodyEnd::ElseIf,
+                ])?;
                 elseif_clauses.push(ElseIfClause {
                     condition: elif_cond,
                     body: elif_body,
@@ -1821,7 +1902,8 @@ impl Parser {
                 // Parse case patterns
                 let patterns = self.parse_case_patterns()?;
                 self.consume_to_eol();
-                let body = self.parse_body(&[BodyEnd::EndSelect, BodyEnd::Case, BodyEnd::CaseElse])?;
+                let body =
+                    self.parse_body(&[BodyEnd::EndSelect, BodyEnd::Case, BodyEnd::CaseElse])?;
                 cases.push(CaseClause { patterns, body });
             } else {
                 let saved = self.pos;
@@ -1980,7 +2062,7 @@ impl Parser {
     fn parse_close_statement(&mut self) -> PbResult<Statement> {
         let line = self.current_line();
         self.advance(); // CLOSE
-        // # is optional in PowerBASIC: CLOSE #filenum or CLOSE filenum
+                        // # is optional in PowerBASIC: CLOSE #filenum or CLOSE filenum
         if self.peek() == &Token::Hash {
             self.advance();
         }
@@ -2177,7 +2259,11 @@ impl Parser {
                 Ok(Expr::FunctionCall("FREEFILE".to_string(), Vec::new()))
             }
             Token::Ubound | Token::Lbound => {
-                let name = if matches!(self.peek(), Token::Ubound) { "UBOUND" } else { "LBOUND" };
+                let name = if matches!(self.peek(), Token::Ubound) {
+                    "UBOUND"
+                } else {
+                    "LBOUND"
+                };
                 let name = name.to_string();
                 self.advance();
                 if self.peek() == &Token::LParen {
@@ -2200,7 +2286,7 @@ impl Parser {
                 self.expect(&Token::LParen)?;
                 let inner = self.parse_expression()?;
                 self.expect(&Token::RParen)?;
-                return Ok(Expr::Varptr(Box::new(inner)));
+                Ok(Expr::Varptr(Box::new(inner)))
             }
             Token::Identifier(name) => {
                 self.advance();
@@ -2242,10 +2328,10 @@ impl Parser {
                 break;
             }
             // Skip ANY keyword (used in PARSE$ calls: PARSE$(str$, ANY "|"))
-            if matches!(self.peek(), Token::Identifier(ref s) if s.eq_ignore_ascii_case("ANY")) {
-                if matches!(self.peek_at(1), Some(Token::StringLiteral(_))) {
-                    self.advance(); // skip ANY
-                }
+            if matches!(self.peek(), Token::Identifier(ref s) if s.eq_ignore_ascii_case("ANY"))
+                && matches!(self.peek_at(1), Some(Token::StringLiteral(_)))
+            {
+                self.advance(); // skip ANY
             }
             // BYVAL/BYCOPY modifier at call site: Foo(BYVAL x) or Foo(BYCOPY s$)
             // Both override BYREF parameter to pass value directly
@@ -2289,9 +2375,7 @@ fn type_from_suffix(name: &str) -> PbType {
         PbType::Integer
     } else if name.ends_with('!') {
         PbType::Single
-    } else if name.ends_with("@@") {
-        PbType::Cur
-    } else if name.ends_with('@') {
+    } else if name.ends_with("@@") || name.ends_with('@') {
         PbType::Cur
     } else if name.ends_with('$') {
         PbType::String

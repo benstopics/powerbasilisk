@@ -27,7 +27,13 @@ pub fn call_builtin(name: &str, args: &[Value]) -> Option<Value> {
         }
         "SGN" => {
             let v = args.first().map(|a| a.to_f64()).unwrap_or(0.0);
-            Some(Value::Long(if v > 0.0 { 1 } else if v < 0.0 { -1 } else { 0 }))
+            Some(Value::Long(if v > 0.0 {
+                1
+            } else if v < 0.0 {
+                -1
+            } else {
+                0
+            }))
         }
         "RND" => {
             // Pseudo-random using system time
@@ -163,13 +169,16 @@ pub fn call_builtin(name: &str, args: &[Value]) -> Option<Value> {
         }
         "STRING" => {
             let count = args.first().map(|a| a.to_i32()).unwrap_or(0) as usize;
-            let ch = args.get(1).map(|a| {
-                if a.is_string() {
-                    a.to_string_val().chars().next().unwrap_or(' ')
-                } else {
-                    char::from_u32(a.to_i32() as u32).unwrap_or(' ')
-                }
-            }).unwrap_or(' ');
+            let ch = args
+                .get(1)
+                .map(|a| {
+                    if a.is_string() {
+                        a.to_string_val().chars().next().unwrap_or(' ')
+                    } else {
+                        char::from_u32(a.to_i32() as u32).unwrap_or(' ')
+                    }
+                })
+                .unwrap_or(' ');
             Some(Value::Str(ch.to_string().repeat(count)))
         }
         "SPACE" => {

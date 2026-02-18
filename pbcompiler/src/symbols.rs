@@ -15,6 +15,7 @@ pub struct VarInfo {
 }
 
 /// Information about a declared array.
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct ArrayInfo {
     /// LLVM name (`@CASH` for global, `%r5` for local alloca)
