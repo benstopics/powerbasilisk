@@ -1,0 +1,9 @@
+[package]
+name = "pb"
+version = "0.1.0"
+edition = "2021"
+description = "Shared PowerBASIC frontend: lexer, parser, AST, preprocessor"
+license = "MIT"
+repository = "https://github.com/benstopics/powerbasilisk"
+
+[dependencies]

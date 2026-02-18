@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "pb",
+    "pbcompiler",
+]
+resolver = "2"

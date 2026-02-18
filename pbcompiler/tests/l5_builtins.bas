@@ -1,0 +1,178 @@
+' L5: Builtin functions (ABS, SGN, MIN, MAX, INT, FIX, CEIL, SQR, math)
+
+FUNCTION PBMAIN() AS LONG
+  LOCAL d AS DOUBLE
+
+  ' Test 1-2: ABS (integer)
+  IF ABS(-5) <> 5 THEN
+    FUNCTION = 1
+    EXIT FUNCTION
+  END IF
+  IF ABS(3) <> 3 THEN
+    FUNCTION = 2
+    EXIT FUNCTION
+  END IF
+
+  ' Test 3-4: ABS (float)
+  d = ABS(-3.5)
+  IF d < 3.4 THEN
+    FUNCTION = 3
+    EXIT FUNCTION
+  END IF
+  IF d > 3.6 THEN
+    FUNCTION = 4
+    EXIT FUNCTION
+  END IF
+
+  ' Test 5-7: SGN
+  IF SGN(-10) <> -1 THEN
+    FUNCTION = 5
+    EXIT FUNCTION
+  END IF
+  IF SGN(0) <> 0 THEN
+    FUNCTION = 6
+    EXIT FUNCTION
+  END IF
+  IF SGN(42) <> 1 THEN
+    FUNCTION = 7
+    EXIT FUNCTION
+  END IF
+
+  ' Test 8-9: MIN / MAX
+  IF MIN(3, 7) <> 3 THEN
+    FUNCTION = 8
+    EXIT FUNCTION
+  END IF
+  IF MAX(3, 7) <> 7 THEN
+    FUNCTION = 9
+    EXIT FUNCTION
+  END IF
+
+  ' Test 10-11: INT (floor)
+  IF INT(3.7) <> 3 THEN
+    FUNCTION = 10
+    EXIT FUNCTION
+  END IF
+  IF INT(-3.7) <> -4 THEN
+    FUNCTION = 11
+    EXIT FUNCTION
+  END IF
+
+  ' Test 12-13: FIX (truncate toward zero)
+  IF FIX(3.7) <> 3 THEN
+    FUNCTION = 12
+    EXIT FUNCTION
+  END IF
+  IF FIX(-3.7) <> -3 THEN
+    FUNCTION = 13
+    EXIT FUNCTION
+  END IF
+
+  ' Test 14-15: CEIL
+  IF CEIL(3.2) <> 4 THEN
+    FUNCTION = 14
+    EXIT FUNCTION
+  END IF
+  IF CEIL(-3.7) <> -3 THEN
+    FUNCTION = 15
+    EXIT FUNCTION
+  END IF
+
+  ' Test 16-17: SQR (square root)
+  d = SQR(16.0)
+  IF d < 3.9 THEN
+    FUNCTION = 16
+    EXIT FUNCTION
+  END IF
+  IF d > 4.1 THEN
+    FUNCTION = 17
+    EXIT FUNCTION
+  END IF
+
+  ' Test 18: CINT (float to int)
+  IF CINT(7.9) <> 7 THEN
+    FUNCTION = 18
+    EXIT FUNCTION
+  END IF
+
+  ' Test 19-20: LOG (ln(1) = 0)
+  d = LOG(1.0)
+  IF d < -0.01 THEN
+    FUNCTION = 19
+    EXIT FUNCTION
+  END IF
+  IF d > 0.01 THEN
+    FUNCTION = 20
+    EXIT FUNCTION
+  END IF
+
+  ' Test 21-22: EXP (e^0 = 1)
+  d = EXP(0.0)
+  IF d < 0.99 THEN
+    FUNCTION = 21
+    EXIT FUNCTION
+  END IF
+  IF d > 1.01 THEN
+    FUNCTION = 22
+    EXIT FUNCTION
+  END IF
+
+  ' Test 23-24: SIN(0) = 0
+  d = SIN(0.0)
+  IF d < -0.01 THEN
+    FUNCTION = 23
+    EXIT FUNCTION
+  END IF
+  IF d > 0.01 THEN
+    FUNCTION = 24
+    EXIT FUNCTION
+  END IF
+
+  ' Test 25-26: COS(0) = 1
+  d = COS(0.0)
+  IF d < 0.99 THEN
+    FUNCTION = 25
+    EXIT FUNCTION
+  END IF
+  IF d > 1.01 THEN
+    FUNCTION = 26
+    EXIT FUNCTION
+  END IF
+
+  ' Test 27-28: ROUND(3.14159, 2) ≈ 3.14
+  d = ROUND(3.14159, 2)
+  IF d < 3.13 THEN
+    FUNCTION = 27
+    EXIT FUNCTION
+  END IF
+  IF d > 3.15 THEN
+    FUNCTION = 28
+    EXIT FUNCTION
+  END IF
+
+  ' Test 29-30: RND(100) in range [0, 99]
+  LOCAL r AS LONG
+  r = RND(100)
+  IF r < 0 THEN
+    FUNCTION = 29
+    EXIT FUNCTION
+  END IF
+  IF r > 99 THEN
+    FUNCTION = 30
+    EXIT FUNCTION
+  END IF
+
+  ' Test 31-32: MIN/MAX with floats
+  d = MIN(2.5, 1.5)
+  IF d > 1.6 THEN
+    FUNCTION = 31
+    EXIT FUNCTION
+  END IF
+  d = MAX(2.5, 1.5)
+  IF d < 2.4 THEN
+    FUNCTION = 32
+    EXIT FUNCTION
+  END IF
+
+  FUNCTION = 0
+END FUNCTION

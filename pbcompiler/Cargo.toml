@@ -1,0 +1,10 @@
+[package]
+name = "pbcompiler"
+version = "0.1.0"
+edition = "2021"
+description = "PowerBASIC compiler: PB source → LLVM IR → native object code"
+license = "MIT"
+repository = "https://github.com/benstopics/powerbasilisk"
+
+[dependencies]
+pb = { path = "../pb" }
