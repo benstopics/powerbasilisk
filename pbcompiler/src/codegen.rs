@@ -17,7 +17,7 @@ pub struct CompileOptions {
     pub emit_llvm: bool,
     pub debug_mode: bool, // enable verbose debug logging (modal text, assertions)
     pub runtime_lib: Option<String>, // path to pb_runtime.obj
-    pub lib_dir: Option<String>, // path to directory containing ui.lib
+    pub lib_dir: Option<String>, // path to directory containing import libraries (.lib)
     pub split_threshold: usize, // split functions exceeding this many IR lines (0 = disabled)
     pub target: String, // LLVM target triple (e.g. "i686-pc-windows-msvc", "x86_64-pc-windows-msvc")
 }
@@ -368,25 +368,25 @@ fn link_exe(obj_paths: &[&Path], exe_path: &Path, opts: &CompileOptions) -> PbRe
     args.push("-o".to_string());
     args.push(exe_path.to_string_lossy().to_string());
 
-    // Add library search path if specified
+    // Always link oleaut32 (needed by pb_runtime for BSTR/SysAllocString)
+    args.push("-loleaut32".to_string());
+
+    // Link additional Windows libraries only when --lib-dir is provided
     if let Some(ref lib_dir) = opts.lib_dir {
         args.push(format!("-L{}", lib_dir));
+        args.extend([
+            "-lui".to_string(),
+            "-lkernel32".to_string(),
+            "-luser32".to_string(),
+            "-lgdi32".to_string(),
+            "-lshell32".to_string(),
+            "-lcomctl32".to_string(),
+            "-lcomdlg32".to_string(),
+            "-ladvapi32".to_string(),
+            "-lole32".to_string(),
+            "-lwinmm".to_string(),
+        ]);
     }
-
-    // Link Windows system libraries + ui.dll import lib
-    args.extend([
-        "-lui".to_string(),
-        "-loleaut32".to_string(),
-        "-lkernel32".to_string(),
-        "-luser32".to_string(),
-        "-lgdi32".to_string(),
-        "-lshell32".to_string(),
-        "-lcomctl32".to_string(),
-        "-lcomdlg32".to_string(),
-        "-ladvapi32".to_string(),
-        "-lole32".to_string(),
-        "-lwinmm".to_string(),
-    ]);
 
     let output = std::process::Command::new("clang")
         .args(&args)
@@ -810,7 +810,7 @@ struct FuncInfo {
     params: Vec<ParamInfo>,
     export: bool,
     is_external: bool, // true if DECLARE LIB (dllimport)
-    is_stdcall: bool,  // true if Win32 API (stdcall on 32-bit), false for cdecl (ui.dll, C runtime)
+    is_stdcall: bool, // true if Win32 API (stdcall on 32-bit), false for cdecl
 }
 
 #[derive(Clone)]
@@ -1499,7 +1499,7 @@ impl Compiler {
         // Determine calling convention and linkage:
         // - Win32 API DLLs: dllimport + stdcall on 32-bit
         // - Stubbed DLLs: regular extern (stubs provided in pb_runtime.c)
-        // - Other DLLs (ui.dll): dllimport + cdecl
+        // - Other DLLs: dllimport + cdecl
         let lib_name = ds.lib.as_deref().unwrap_or("").to_uppercase();
         let is_stdcall = self.module.is_32bit() && Self::is_win32_stdcall_dll(&lib_name);
         let is_stubbed = Self::is_stubbed_dll(&lib_name);

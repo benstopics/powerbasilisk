@@ -193,7 +193,7 @@ impl ModuleBuilder {
         }
     }
 
-    /// Declare a dllimport function with cdecl convention (for C runtime and ui.dll functions).
+    /// Declare a dllimport function with cdecl convention (for C runtime and external DLLs).
     pub fn declare_dllimport_cdecl(&mut self, name: &str, ret: &IrType, params: &[IrType]) {
         if !self.declared.insert(name.to_string()) {
             return; // already declared
